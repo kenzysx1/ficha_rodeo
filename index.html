@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Waymaker RPG - Owlbear Rodeo Extension</title>
+  <title>Waymaker RPG - Ficha de Personagem</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -56,33 +56,43 @@
 <body class="w-full min-h-screen p-3 flex flex-col justify-start select-none">
 
   <!-- BARRA DE VÍNCULO DO OWLBEAR RODEO -->
-  <header class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 mb-3 shadow-lg flex flex-wrap items-center justify-between gap-2">
-    <div class="flex items-center space-x-2">
-      <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow">
-        W
+  <header class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 mb-3 shadow-lg flex flex-col gap-2">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center space-x-2">
+        <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow">
+          W
+        </div>
+        <div>
+          <h1 class="font-header text-xs font-bold text-slate-100 tracking-wider">WAYMAKER</h1>
+          <p id="connectionStatus" class="text-[9px] text-slate-400 font-medium">⚪ Conectando ao Owlbear...</p>
+        </div>
       </div>
-      <div>
-        <h1 class="font-header text-xs font-bold text-slate-100 tracking-wider">WAYMAKER</h1>
-        <p id="tokenStatus" class="text-[10px] text-slate-400 font-medium">Modo Local (Clique num token)</p>
+
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <button id="btnSyncToken" onclick="saveToSelectedToken()" title="Salvar dados no Token selecionado" class="hidden px-2.5 py-1 bg-purple-700/60 hover:bg-purple-600 text-purple-200 text-xs rounded border border-purple-500/40 transition flex items-center gap-1 font-semibold">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Salvar no Token
+        </button>
+        <button onclick="exportJSON()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded border border-slate-700 transition" title="Exportar JSON">
+          <i class="fa-solid fa-download"></i>
+        </button>
+        <label class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded border border-slate-700 cursor-pointer transition" title="Importar JSON">
+          <i class="fa-solid fa-upload"></i>
+          <input type="file" id="jsonInput" accept=".json" class="hidden" onchange="importJSON(event)">
+        </label>
+        <button onclick="resetSheet()" class="px-2 py-1 bg-red-950/40 hover:bg-red-900/60 text-red-400 text-xs rounded border border-red-800/40 transition" title="Limpar Ficha">
+          <i class="fa-solid fa-trash"></i>
+        </button>
       </div>
     </div>
 
-    <div class="flex items-center gap-1.5 flex-wrap">
-      <button id="btnSyncToken" title="Salvar no Token selecionado no mapa" class="hidden px-2.5 py-1 bg-purple-700/60 hover:bg-purple-600 text-purple-200 text-xs rounded border border-purple-500/40 transition flex items-center gap-1 font-semibold">
-        <i class="fa-solid fa-cloud-arrow-up"></i> Salvar no Token
-      </button>
-      <button onclick="openDiceModal()" class="px-2.5 py-1 bg-indigo-600/40 hover:bg-indigo-600/70 text-indigo-200 border border-indigo-500/50 text-xs rounded transition flex items-center gap-1 font-semibold">
-        <i class="fa-solid fa-dice-d20"></i> Rolar
-      </button>
-      <button onclick="exportJSON()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded border border-slate-700 transition" title="Exportar JSON">
-        <i class="fa-solid fa-download"></i>
-      </button>
-      <label class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded border border-slate-700 cursor-pointer transition" title="Importar JSON">
-        <i class="fa-solid fa-upload"></i>
-        <input type="file" id="jsonInput" accept=".json" class="hidden" onchange="importJSON(event)">
-      </label>
-      <button onclick="resetSheet()" class="px-2 py-1 bg-red-950/40 hover:bg-red-900/60 text-red-400 text-xs rounded border border-red-800/40 transition" title="Limpar Ficha">
-        <i class="fa-solid fa-trash"></i>
+    <!-- SELETOR DIRETO DE TOKEN -->
+    <div class="flex items-center gap-2 pt-1 border-t border-slate-800/80">
+      <span class="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap"><i class="fa-solid fa-chess-pawn text-purple-400 mr-1"></i> Token:</span>
+      <select id="tokenSelect" class="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-purple-300 flex-grow focus:outline-none focus:border-purple-500">
+        <option value="">-- Ficha Local (Nenhum Token) --</option>
+      </select>
+      <button onclick="refreshTokensList()" title="Atualizar Lista de Tokens do Mapa" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded border border-slate-700 transition">
+        <i class="fa-solid fa-rotate"></i>
       </button>
     </div>
   </header>
@@ -244,70 +254,15 @@
     </div>
   </main>
 
-  <!-- DICE ROLLER MODAL -->
-  <div id="diceModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden select-none overflow-y-auto">
-    <div class="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-xl p-4 shadow-2xl relative my-auto">
-      <button onclick="closeDiceModal()" class="absolute top-3 right-3 text-slate-400 hover:text-white">
-        <i class="fa-solid fa-xmark text-sm"></i>
-      </button>
-
-      <h3 class="font-header text-sm font-bold text-purple-300 mb-3"><i class="fa-solid fa-dice-d20 mr-1"></i> ROLAGEM DE DADOS</h3>
-      
-      <div class="grid grid-cols-2 gap-2 mb-3">
-        <div class="col-span-2">
-          <label class="block text-[9px] font-bold text-slate-400 mb-0.5">Atributo Base</label>
-          <select id="diceAttrSelect" class="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200"></select>
-        </div>
-        <div class="col-span-2">
-          <label class="block text-[9px] font-bold text-slate-400 mb-0.5">Perícia (Opcional)</label>
-          <select id="diceSkillSelect" class="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200"></select>
-        </div>
-        <div>
-          <label class="block text-[9px] font-bold text-slate-400 mb-0.5">Modificador</label>
-          <select id="diceMod" class="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200">
-            <option value="n">Normal</option>
-            <option value="v">Vantagem (+)</option>
-            <option value="d">Desvantagem (-)</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-[9px] font-bold text-slate-400 mb-0.5">Dificuldade (DC)</label>
-          <input type="number" id="diceDC" value="1" min="1" class="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200">
-        </div>
-        <div class="col-span-2 pt-1">
-          <button onclick="rollDicePool()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg shadow transition">ROLAR DADOS</button>
-        </div>
-      </div>
-      
-      <div id="diceResultBox" class="hidden bg-slate-950 border rounded-xl p-3 text-center transition-colors">
-        <h4 id="diceResultTitle" class="text-xs font-bold uppercase mb-1"></h4>
-        <p id="diceResultDesc" class="text-[10px] text-slate-400 mb-2"></p>
-        
-        <div id="dicePoolVisual" class="flex flex-wrap justify-center gap-1.5 my-2"></div>
-        
-        <div class="grid grid-cols-4 gap-1.5 text-center text-[10px] mb-2">
-          <div class="bg-slate-900 rounded p-1 border border-slate-800"><span class="block text-slate-500">Dados</span><strong id="resDados" class="text-slate-200"></strong></div>
-          <div class="bg-slate-900 rounded p-1 border border-slate-800"><span class="block text-slate-500">DC</span><strong id="resDC" class="text-slate-200"></strong></div>
-          <div class="bg-slate-900 rounded p-1 border border-slate-800"><span class="block text-slate-500">Sucessos</span><strong id="resSucessos" class="text-slate-200"></strong></div>
-          <div class="bg-slate-900 rounded p-1 border border-slate-800"><span class="block text-slate-500">Compl.</span><strong id="resComplicacoes" class="text-slate-200"></strong></div>
-        </div>
-        
-        <button id="btnPagarPreco" onclick="pagarPreco()" class="hidden w-full py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded shadow transition flex items-center justify-center gap-1">
-          <i class="fa-solid fa-scale-balanced"></i> Pagar o Preço
-        </button>
-      </div>
-    </div>
-  </div>
-
   <!-- TOAST NOTIFICATION -->
   <div id="toast" class="fixed bottom-3 right-3 bg-slate-800 text-slate-100 border border-purple-500/50 px-3 py-2 rounded-lg shadow-xl transition-all duration-300 transform translate-y-16 opacity-0 z-50 flex items-center gap-2 text-xs">
     <i id="toastIcon" class="fa-solid fa-circle-check text-purple-400"></i>
     <span id="toastMessage"></span>
   </div>
 
-  <!-- INTEGRAÇÃO OWLBEAR RODEO SDK (ESM) -->
+  <!-- INTEGRAÇÃO OWLBEAR RODEO SDK -->
   <script type="module">
-    import OBR from "https://esm.sh/@owlbear-rodeo/sdk";
+    import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@latest/+esm";
 
     const SHEET_METADATA_KEY = "com.waymaker.sheet/data";
     let selectedTokenId = null;
@@ -321,79 +276,120 @@
       { id: 'car', name: 'CAR (Carisma)', dots: 1 }
     ];
     let currentSkills = [];
-    let currentRoll = null;
 
-    // Inicialização com o Owlbear Rodeo
+    // Inicialização
+    renderAttributes();
+    renderSkills();
+    loadFromLocalStorage();
+
+    // Evento de troca manual no seletor Dropdown
+    document.getElementById('tokenSelect').addEventListener('change', async (e) => {
+      const tokenId = e.target.value;
+      if (!tokenId) {
+        clearBoundToken();
+      } else {
+        const items = await OBR.scene.items.getItems([tokenId]);
+        if (items.length > 0) {
+          setBoundToken(items[0]);
+        }
+      }
+    });
+
+    // Conexão com o Owlbear Rodeo
     OBR.onReady(async () => {
-      renderAttributes();
-      renderSkills();
-      loadFromLocalStorage();
+      const statusEl = document.getElementById('connectionStatus');
+      statusEl.innerText = "🟢 Conectado ao Owlbear";
+      statusEl.className = "text-[9px] text-green-400 font-semibold";
 
-      // Função que analisa a seleção atual de tokens
-      async function handleSelection(selection) {
-        if (selection && selection.length === 1) {
-          const items = await OBR.scene.items.getItems([selection[0]]);
+      await refreshTokensList();
+
+      // Detecta seleção atual do jogador
+      const selection = await OBR.player.getSelection();
+      if (selection && selection.length === 1) {
+        const items = await OBR.scene.items.getItems([selection[0]]);
+        if (items.length > 0) {
+          setBoundToken(items[0]);
+        }
+      }
+
+      // Escuta quando o jogador clica em um token no mapa
+      OBR.player.onChange(async (player) => {
+        if (player.selection && player.selection.length === 1) {
+          const items = await OBR.scene.items.getItems([player.selection[0]]);
           if (items.length > 0) {
             setBoundToken(items[0]);
-            return;
           }
         }
-        clearBoundToken();
-      }
-
-      // 1. Detecta imediatamente se já existe um token selecionado antes de abrir
-      try {
-        const initialSelection = await OBR.player.getSelection();
-        await handleSelection(initialSelection);
-      } catch (err) {
-        console.error("Erro na seleção inicial:", err);
-      }
-
-      // 2. Escuta mudanças na seleção do jogador no mapa
-      OBR.player.onChange(async (player) => {
-        await handleSelection(player.selection);
       });
 
-      // Configura o clique do botão manual "Salvar no Token"
-      document.getElementById('btnSyncToken').addEventListener('click', saveToSelectedToken);
+      // Atualiza a lista caso novos tokens sejam adicionados ao mapa
+      OBR.scene.items.onChange(() => {
+        refreshTokensList();
+      });
     });
+
+    // Atualiza o menu suspenso de tokens
+    window.refreshTokensList = async function() {
+      if (!OBR.isReady) return;
+      const select = document.getElementById('tokenSelect');
+      const curVal = select.value;
+      
+      try {
+        const items = await OBR.scene.items.getItems();
+        select.innerHTML = '<option value="">-- Ficha Local (Nenhum Token) --</option>';
+
+        items.forEach(t => {
+          const name = t.text?.plainText || t.name || (t.layer ? `${t.layer} (${t.id.slice(0,4)})` : null);
+          if (name) {
+            const opt = document.createElement('option');
+            opt.value = t.id;
+            opt.textContent = name;
+            select.appendChild(opt);
+          }
+        });
+
+        if (selectedTokenId) {
+          select.value = selectedTokenId;
+        } else if (curVal) {
+          select.value = curVal;
+        }
+      } catch (err) {
+        console.error("Erro ao listar tokens:", err);
+      }
+    };
 
     function setBoundToken(token) {
       selectedTokenId = token.id;
-      const statusEl = document.getElementById('tokenStatus');
+      const select = document.getElementById('tokenSelect');
       const btnSync = document.getElementById('btnSyncToken');
       
-      const tokenName = token.text?.plainText || token.name || 'Token Selecionado';
-      statusEl.innerText = `Token: ${tokenName}`;
-      statusEl.className = "text-[10px] text-purple-400 font-bold truncate max-w-[140px]";
+      select.value = token.id;
       btnSync.classList.remove('hidden');
 
-      // Se o token já tiver dados salvos no metadata, carrega a ficha do token
+      const tokenName = token.text?.plainText || token.name || 'Token';
+
       if (token.metadata && token.metadata[SHEET_METADATA_KEY]) {
         applyDataToSheet(token.metadata[SHEET_METADATA_KEY]);
-        showToast(`Ficha carregada: ${tokenName}`);
+        showToast(`Carregado: ${tokenName}`);
       } else {
-        // Se a ficha não tiver nome preenchido, sugere o nome do token
         const charName = document.getElementById('charName').value.trim();
-        if (!charName && (token.name || token.text?.plainText)) {
-          document.getElementById('charName').value = token.text?.plainText || token.name;
+        if (!charName && tokenName) {
+          document.getElementById('charName').value = tokenName;
         }
-        showToast(`Vinculado! Clique em "Salvar no Token".`);
+        showToast(`Token selecionado: ${tokenName}`);
       }
     }
 
     function clearBoundToken() {
       selectedTokenId = null;
-      const statusEl = document.getElementById('tokenStatus');
-      const btnSync = document.getElementById('btnSyncToken');
-      statusEl.innerText = "Modo Local (Clique num token)";
-      statusEl.className = "text-[10px] text-slate-400 font-medium";
-      btnSync.classList.add('hidden');
+      document.getElementById('tokenSelect').value = "";
+      document.getElementById('btnSyncToken').classList.add('hidden');
+      showToast("Modo local ativo.");
     }
 
-    async function saveToSelectedToken() {
+    window.saveToSelectedToken = async function() {
       if (!selectedTokenId) {
-        showToast("Nenhum token selecionado no mapa!", "fa-circle-exclamation");
+        showToast("Selecione um token na lista acima!", "fa-circle-exclamation");
         return;
       }
       const sheetData = collectSheetData();
@@ -403,14 +399,13 @@
           item.metadata[SHEET_METADATA_KEY] = sheetData;
         }
       });
-      showToast("Ficha salva no Token!");
-    }
+      showToast("Ficha gravada no Token!");
+    };
 
-    // Auto-save local e no token ativo
     window.autoSave = function() {
       const data = collectSheetData();
       localStorage.setItem('waymaker_local_sheet', JSON.stringify(data));
-      if (selectedTokenId) {
+      if (selectedTokenId && OBR.isReady) {
         saveToSelectedToken();
       }
     };
@@ -678,195 +673,6 @@
       ['weaponsContainer', 'tecnicasPoderesContainer', 'itensContainer'].forEach(id => document.getElementById(id).innerHTML = '');
       autoSave();
       showToast('Ficha reiniciada!');
-    };
-
-    function getPipDieHTML(value, isWild = false, isSuccess = false, isComp = false) {
-      const pipPositions = {
-        1: [4],
-        2: [0, 8],
-        3: [0, 4, 8],
-        4: [0, 2, 6, 8],
-        5: [0, 2, 4, 6, 8],
-        6: [0, 2, 3, 5, 6, 8]
-      };
-      const activePips = pipPositions[value] || [4];
-
-      let bgClass = "bg-slate-900";
-      let borderClass = "border-slate-700/80";
-      let pipColor = "bg-slate-300";
-
-      if (isWild) {
-        bgClass = "bg-purple-950/80";
-        borderClass = "border-2 border-purple-400";
-        pipColor = "bg-purple-300 shadow-[0_0_5px_rgba(192,132,252,0.9)]";
-      } else if (isSuccess) {
-        bgClass = "bg-green-950/50";
-        borderClass = "border border-green-500/60";
-        pipColor = "bg-green-400 shadow-[0_0_4px_rgba(74,222,128,0.9)]";
-      } else if (isComp) {
-        bgClass = "bg-red-950/50";
-        borderClass = "border border-red-500/60";
-        pipColor = "bg-red-400 shadow-[0_0_4px_rgba(248,113,113,0.9)]";
-      }
-
-      let pipsHTML = '';
-      for (let i = 0; i < 9; i++) {
-        const isActive = activePips.includes(i);
-        pipsHTML += `<div class="flex items-center justify-center">
-          <span class="w-1.5 h-1.5 rounded-full ${isActive ? pipColor : 'bg-transparent'}"></span>
-        </div>`;
-      }
-
-      return `
-        <div class="w-9 h-9 rounded-lg p-1 grid grid-cols-3 grid-rows-3 gap-0.5 ${bgClass} ${borderClass} shadow-sm">
-          ${pipsHTML}
-        </div>
-      `;
-    }
-
-    window.openDiceModal = function() {
-      const attr = document.getElementById('diceAttrSelect');
-      const skill = document.getElementById('diceSkillSelect');
-      attr.innerHTML = currentAttributes.map(a => `<option value="${a.dots}">${a.name} (${a.dots})</option>`).join('');
-      skill.innerHTML = '<option value="0">Sem perícia (0)</option>' + currentSkills.map(s => `<option value="${s.dots}">${s.name || 'Nova'} (${s.dots})</option>`).join('');
-      document.getElementById('diceResultBox').classList.add('hidden');
-      document.getElementById('diceModal').classList.remove('hidden');
-      currentRoll = null;
-    };
-
-    window.closeDiceModal = function() {
-      document.getElementById('diceModal').classList.add('hidden');
-    };
-
-    window.rollDicePool = async function() {
-      let attrVal = parseInt(document.getElementById('diceAttrSelect').value) || 0;
-      let skillVal = parseInt(document.getElementById('diceSkillSelect').value) || 0;
-      let qtdTotalDados = Math.max(1, attrVal + skillVal);
-      let qtdDadosNormais = qtdTotalDados - 1;
-
-      let dc = parseInt(document.getElementById('diceDC').value) || 1;
-      let modo = document.getElementById('diceMod').value;
-
-      let dadoEspecial = Math.floor(Math.random() * 6) + 1;
-      let dadosNormais = [];
-      for(let i = 0; i < qtdDadosNormais; i++) {
-        dadosNormais.push(Math.floor(Math.random() * 6) + 1);
-      }
-
-      let sucessos = 0;
-      let complicacoes = 0;
-
-      dadosNormais.forEach(d => {
-        if (d === 5 || d === 6) sucessos++;
-        else if (d === 4 && modo === 'v') sucessos++;
-        if (modo === 'd' && (d === 1 || d === 2)) complicacoes++;
-      });
-
-      if (dadoEspecial === 6) sucessos += 2;
-      else if (dadoEspecial === 5) sucessos += 1;
-      else if (dadoEspecial === 4 && modo === 'v') sucessos += 1;
-
-      if (dadoEspecial === 1) complicacoes += 1;
-      else if (dadoEspecial === 2 && modo === 'd') complicacoes += 1;
-
-      let ampliacoes = sucessos >= dc ? sucessos - dc : 0;
-
-      currentRoll = { qtdDadosNormais, dc, modo, dadoEspecial, dadosNormais, sucessos, complicacoes, ampliacoes };
-      renderRollResult();
-
-      // Transmite a notificação para todos na mesa do Owlbear Rodeo
-      const charName = document.getElementById('charName').value.trim() || 'Personagem';
-      const outcome = sucessos >= dc ? 'SUCESSO' : 'FALHA';
-      try {
-        await OBR.notification.show(`🎲 ${charName} rolou ${qtdTotalDados}d6 (DC ${dc}): ${outcome}! [Sucessos: ${sucessos} | Complicações: ${complicacoes}]`);
-      } catch (e) {
-        console.log("Notificação local.");
-      }
-    };
-
-    function renderRollResult(pagouPreco = false) {
-      if (!currentRoll) return;
-      const { qtdDadosNormais, dc, modo, dadoEspecial, dadosNormais, sucessos, complicacoes, ampliacoes } = currentRoll;
-      
-      let titulo = "";
-      let desc = "";
-      let corBorda = "";
-      let corTexto = "";
-
-      if (pagouPreco) {
-        if (complicacoes > 0) {
-          titulo = "⚠️ SUCESSO C/ COMPLICAÇÃO (PREÇO PAGO)";
-          corBorda = "border-orange-500/50"; corTexto = "text-orange-400";
-          desc = `Resta(m) ${complicacoes} Complicação(ões).`;
-        } else {
-          titulo = "✅ SUCESSO (PREÇO PAGO)";
-          corBorda = "border-green-500/50"; corTexto = "text-green-400";
-          desc = "Todas as complicações foram anuladas!";
-        }
-      } else {
-        if (sucessos >= dc) {
-          if (complicacoes > 0) {
-            titulo = "⚠️ SUCESSO C/ COMPLICAÇÃO";
-            corBorda = "border-orange-500/50"; corTexto = "text-orange-400";
-            desc = `Atingiu a DC, mas gerou ${complicacoes} Complicação(ões)!`;
-          } else if (ampliacoes > 0) {
-            titulo = "🌟 SUCESSO AMPLIADO";
-            corBorda = "border-green-500/50"; corTexto = "text-green-400";
-            desc = `Superou a DC com +${ampliacoes} Ampliação(ões)!`;
-          } else {
-            titulo = "✅ SUCESSO";
-            corBorda = "border-green-500/50"; corTexto = "text-green-400";
-            desc = "Atingiu a DC requerida.";
-          }
-        } else {
-          titulo = complicacoes > 0 ? "💀 FALHA CRÍTICA" : "❌ FALHA";
-          corBorda = "border-red-600/60"; corTexto = "text-red-500";
-          desc = `Não atingiu a DC.${complicacoes > 0 ? ` +${complicacoes} Complicação(ões)!` : ''}`;
-        }
-      }
-
-      const box = document.getElementById('diceResultBox');
-      box.className = `bg-slate-950 border ${corBorda} rounded-xl p-3 text-center block`;
-      
-      const titleEl = document.getElementById('diceResultTitle');
-      titleEl.className = `text-xs font-bold uppercase mb-1 ${corTexto}`;
-      titleEl.innerText = titulo;
-      document.getElementById('diceResultDesc').innerText = desc;
-      
-      let visualHtml = getPipDieHTML(dadoEspecial, true);
-      dadosNormais.forEach(d => {
-        let isSuccess = (d === 5 || d === 6) || (d === 4 && modo === 'v');
-        let isComp = modo === 'd' && (d === 1 || d === 2);
-        visualHtml += getPipDieHTML(d, false, isSuccess, isComp);
-      });
-      document.getElementById('dicePoolVisual').innerHTML = visualHtml;
-
-      document.getElementById('resDados').innerText = `${qtdDadosNormais + 1}d6`;
-      document.getElementById('resDC').innerText = dc;
-      document.getElementById('resSucessos').innerText = sucessos + (ampliacoes > 0 ? ` (+${ampliacoes})` : "");
-      document.getElementById('resComplicacoes').innerText = complicacoes;
-
-      const btn = document.getElementById('btnPagarPreco');
-      if (!pagouPreco && complicacoes > 0 && ampliacoes > 0) {
-        btn.classList.remove('hidden');
-        btn.innerHTML = `<i class="fa-solid fa-scale-balanced"></i> Pagar o Preço (${Math.min(ampliacoes, complicacoes)})`;
-        btn.disabled = false;
-      } else if (pagouPreco) {
-        btn.classList.remove('hidden');
-        btn.innerHTML = `<i class="fa-solid fa-check"></i> Preço Pago`;
-        btn.disabled = true;
-      } else {
-        btn.classList.add('hidden');
-      }
-    }
-
-    window.pagarPreco = function() {
-      if (!currentRoll || currentRoll.complicacoes <= 0 || currentRoll.ampliacoes <= 0) return;
-      let custo = Math.min(currentRoll.ampliacoes, currentRoll.complicacoes);
-      currentRoll.sucessos -= custo;
-      currentRoll.ampliacoes = currentRoll.sucessos >= currentRoll.dc ? currentRoll.sucessos - currentRoll.dc : 0;
-      currentRoll.complicacoes -= custo;
-      renderRollResult(true);
     };
 
     function showToast(msg, icon = 'fa-circle-check') {
