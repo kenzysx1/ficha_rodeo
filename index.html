@@ -52,17 +52,6 @@
     ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #334155; }
   </style>
-
-  <!-- Capturador de erros visual para nunca travar em silêncio -->
-  <script>
-    window.addEventListener('error', function(e) {
-      var el = document.getElementById('connectionStatus');
-      if (el) {
-        el.innerText = '🔴 Erro: ' + (e.message || 'Falha ao carregar script');
-        el.className = 'text-[9px] text-red-400 font-bold';
-      }
-    });
-  </script>
 </head>
 <body class="w-full min-h-screen p-3 flex flex-col justify-start select-none">
 
@@ -75,7 +64,7 @@
         </div>
         <div>
           <h1 class="font-header text-xs font-bold text-slate-100 tracking-wider">WAYMAKER</h1>
-          <p id="connectionStatus" class="text-[9px] text-amber-400 font-medium">⚪ Conectando ao Owlbear...</p>
+          <p id="connectionStatus" class="text-[9px] text-amber-400 font-medium">Iniciando...</p>
         </div>
       </div>
 
@@ -271,11 +260,8 @@
     <span id="toastMessage"></span>
   </div>
 
-  <!-- SCRIPT INTEGRADO COM PACOTE CONSOLIDADO DO OWLBEAR RODEO -->
-  <script type="module">
-    import * as OBRModule from "https://esm.sh/@owlbear-rodeo/sdk?bundle";
-    const OBR = OBRModule.default || OBRModule.OBR || OBRModule;
-
+  <script>
+    let OBR = null;
     const SHEET_METADATA_KEY = "com.waymaker.sheet/data";
     let selectedTokenId = null;
 
@@ -289,83 +275,110 @@
     ];
     let currentSkills = [];
 
-    // Render inicial
+    // Render imediato dos campos
     renderAttributes();
     renderSkills();
     loadFromLocalStorage();
 
-    // Evento de troca no seletor de tokens
+    // Evento de troca manual no seletor Dropdown
     document.getElementById('tokenSelect').addEventListener('change', async (e) => {
       const tokenId = e.target.value;
       if (!tokenId) {
         clearBoundToken();
       } else {
+        if (!OBR) return;
         try {
           const items = await OBR.scene.items.getItems([tokenId]);
-          if (items.length > 0) {
-            setBoundToken(items[0]);
-          }
+          if (items.length > 0) setBoundToken(items[0]);
         } catch (err) {
           console.error(err);
         }
       }
     });
 
-    // Timeout de segurança caso abra fora do Owlbear Rodeo
-    setTimeout(() => {
-      if (!OBR.isReady) {
-        const el = document.getElementById('connectionStatus');
-        if (el && el.innerText.includes('Conectando')) {
-          el.innerText = '🟡 Modo Navegador (Fora do Owlbear)';
-          el.className = 'text-[9px] text-amber-400 font-medium';
+    // Carregador robusto com múltiplos provedores CDN
+    async function initSDK() {
+      const statusEl = document.getElementById('connectionStatus');
+      const providers = [
+        "https://esm.sh/@owlbear-rodeo/sdk",
+        "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk/+esm",
+        "https://cdn.skypack.dev/@owlbear-rodeo/sdk"
+      ];
+
+      for (let i = 0; i < providers.length; i++) {
+        const url = providers[i];
+        try {
+          statusEl.innerText = `1/2: Baixando SDK (${i + 1}/${providers.length})...`;
+          const mod = await import(url);
+          OBR = mod.default || mod.OBR || mod;
+          if (OBR && typeof OBR.onReady === 'function') {
+            break;
+          }
+        } catch (err) {
+          console.warn(`Provedor ${url} falhou:`, err);
         }
       }
-    }, 3500);
 
-    // Inicialização segura no Owlbear Rodeo
-    OBR.onReady(async () => {
-      const statusEl = document.getElementById('connectionStatus');
-      statusEl.innerText = "🟢 Conectado ao Owlbear";
-      statusEl.className = "text-[9px] text-green-400 font-semibold";
+      if (!OBR || typeof OBR.onReady !== 'function') {
+        statusEl.innerText = "🔴 Falha ao carregar SDK";
+        statusEl.className = "text-[9px] text-red-400 font-bold";
+        return;
+      }
 
-      async function setupSceneData() {
-        const isSceneReady = await OBR.scene.isReady();
-        if (isSceneReady) {
-          await refreshTokensList();
-          
-          // Verifica se já havia um token selecionado no mapa
-          const selection = await OBR.player.getSelection();
-          if (selection && selection.length === 1) {
-            const items = await OBR.scene.items.getItems([selection[0]]);
+      statusEl.innerText = "2/2: Conectando à sala...";
+
+      // Timeout caso abra fora do Owlbear Rodeo
+      setTimeout(() => {
+        if (!OBR.isReady) {
+          if (statusEl.innerText.includes('Conectando')) {
+            statusEl.innerText = "🟡 Modo Navegador (Fora do Owlbear)";
+            statusEl.className = "text-[9px] text-amber-400 font-medium";
+          }
+        }
+      }, 4000);
+
+      // Quando o Owlbear Rodeo der o sinal de pronto
+      OBR.onReady(async () => {
+        statusEl.innerText = "🟢 Conectado ao Owlbear";
+        statusEl.className = "text-[9px] text-green-400 font-semibold";
+
+        async function updateScene() {
+          try {
+            const ready = await OBR.scene.isReady();
+            if (ready) {
+              await refreshTokensList();
+              const sel = await OBR.player.getSelection();
+              if (sel && sel.length === 1) {
+                const items = await OBR.scene.items.getItems([sel[0]]);
+                if (items.length > 0) setBoundToken(items[0]);
+              }
+            }
+          } catch(e) {
+            console.error(e);
+          }
+        }
+
+        await updateScene();
+
+        OBR.scene.onReadyChange(async (ready) => {
+          if (ready) await updateScene();
+        });
+
+        OBR.player.onChange(async (player) => {
+          if (player.selection && player.selection.length === 1) {
+            const items = await OBR.scene.items.getItems([player.selection[0]]);
             if (items.length > 0) setBoundToken(items[0]);
           }
-        }
-      }
+        });
 
-      await setupSceneData();
-
-      // Quando o cenário terminar de carregar
-      OBR.scene.onReadyChange(async (ready) => {
-        if (ready) await setupSceneData();
+        OBR.scene.items.onChange(async () => {
+          await refreshTokensList();
+        });
       });
+    }
 
-      // Monitora clique/seleção de tokens no mapa
-      OBR.player.onChange(async (player) => {
-        if (player.selection && player.selection.length === 1) {
-          const items = await OBR.scene.items.getItems([player.selection[0]]);
-          if (items.length > 0) {
-            setBoundToken(items[0]);
-          }
-        }
-      });
+    initSDK();
 
-      // Se miniaturas forem adicionadas ou renomeadas no mapa
-      OBR.scene.items.onChange(async () => {
-        await refreshTokensList();
-      });
-    });
-
-    // Função para extrair o melhor nome da miniatura
     function extractTokenName(token) {
       if (token.text && token.text.plainText && token.text.plainText.trim() !== '') {
         return token.text.plainText.trim();
@@ -376,9 +389,8 @@
       return `${token.layer || 'Token'} (${token.id.slice(0, 4)})`;
     }
 
-    // Atualiza a lista suspensa de tokens
     window.refreshTokensList = async function() {
-      if (!OBR.isReady) return;
+      if (!OBR || !OBR.isReady) return;
       try {
         const isReady = await OBR.scene.isReady();
         if (!isReady) return;
@@ -388,7 +400,6 @@
         const curVal = select.value;
         select.innerHTML = '<option value="">-- Ficha Local (Nenhum Token) --</option>';
 
-        // Filtra apenas personagens ou itens com imagem/nome
         const tokens = items.filter(i => i.layer === "CHARACTER" || i.layer === "PROP" || i.layer === "MOUNT" || (i.name && i.name.trim() !== ''));
 
         tokens.forEach(t => {
@@ -419,7 +430,6 @@
 
       const tokenName = extractTokenName(token);
 
-      // Carrega os dados se o token já tiver ficha gravada
       if (token.metadata && token.metadata[SHEET_METADATA_KEY]) {
         applyDataToSheet(token.metadata[SHEET_METADATA_KEY]);
         showToast(`Token: ${tokenName}`);
@@ -440,7 +450,7 @@
     }
 
     window.saveToSelectedToken = async function() {
-      if (!selectedTokenId) {
+      if (!selectedTokenId || !OBR) {
         showToast("Escolha um token no menu acima!", "fa-circle-exclamation");
         return;
       }
@@ -457,7 +467,7 @@
     window.autoSave = function() {
       const data = collectSheetData();
       localStorage.setItem('waymaker_local_sheet', JSON.stringify(data));
-      if (selectedTokenId && OBR.isReady) {
+      if (selectedTokenId && OBR && OBR.isReady) {
         saveToSelectedToken();
       }
     };
@@ -473,7 +483,7 @@
       }
     }
 
-    window.renderAttributes = function() {
+    function renderAttributes() {
       const container = document.getElementById('attributesContainer');
       container.innerHTML = '';
       currentAttributes.forEach((attr, attrIdx) => {
@@ -488,7 +498,7 @@
         row.innerHTML = `<span class="text-[10px] font-bold text-slate-200">${attr.name}</span>${dotsHTML}`;
         container.appendChild(row);
       });
-    };
+    }
 
     window.setAttributeDots = function(index, value) {
       if (currentAttributes[index].dots === value && value > 1) {
@@ -500,7 +510,7 @@
       autoSave();
     };
 
-    window.renderSkills = function() {
+    function renderSkills() {
       const container = document.getElementById('skillsContainer');
       const emptyState = document.getElementById('skillsEmptyState');
       container.innerHTML = '';
@@ -528,7 +538,7 @@
           container.appendChild(col);
         });
       }
-    };
+    }
 
     window.setSkillDots = function(index, value) {
       if (currentSkills[index].dots === value) currentSkills[index].dots = value - 1;
