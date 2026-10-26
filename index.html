@@ -52,6 +52,16 @@
     ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #334155; }
   </style>
+
+  <script>
+    window.addEventListener('error', function(e) {
+      var el = document.getElementById('connectionStatus');
+      if (el) {
+        el.innerText = '🔴 Erro: ' + (e.message || 'Falha no script');
+        el.className = 'text-[9px] text-red-400 font-bold';
+      }
+    });
+  </script>
 </head>
 <body class="w-full min-h-screen p-3 flex flex-col justify-start select-none">
 
@@ -275,216 +285,10 @@
     ];
     let currentSkills = [];
 
-    // Render imediato dos campos
-    renderAttributes();
-    renderSkills();
-    loadFromLocalStorage();
-
-    // Evento de troca manual no seletor Dropdown
-    document.getElementById('tokenSelect').addEventListener('change', async (e) => {
-      const tokenId = e.target.value;
-      if (!tokenId) {
-        clearBoundToken();
-      } else {
-        if (!OBR) return;
-        try {
-          const items = await OBR.scene.items.getItems([tokenId]);
-          if (items.length > 0) setBoundToken(items[0]);
-        } catch (err) {
-          console.error(err);
-        }
-      }
-    });
-
-    // Carregador robusto com múltiplos provedores CDN
-    async function initSDK() {
-      const statusEl = document.getElementById('connectionStatus');
-      const providers = [
-        "https://esm.sh/@owlbear-rodeo/sdk",
-        "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk/+esm",
-        "https://cdn.skypack.dev/@owlbear-rodeo/sdk"
-      ];
-
-      for (let i = 0; i < providers.length; i++) {
-        const url = providers[i];
-        try {
-          statusEl.innerText = `1/2: Baixando SDK (${i + 1}/${providers.length})...`;
-          const mod = await import(url);
-          OBR = mod.default || mod.OBR || mod;
-          if (OBR && typeof OBR.onReady === 'function') {
-            break;
-          }
-        } catch (err) {
-          console.warn(`Provedor ${url} falhou:`, err);
-        }
-      }
-
-      if (!OBR || typeof OBR.onReady !== 'function') {
-        statusEl.innerText = "🔴 Falha ao carregar SDK";
-        statusEl.className = "text-[9px] text-red-400 font-bold";
-        return;
-      }
-
-      statusEl.innerText = "2/2: Conectando à sala...";
-
-      // Timeout caso abra fora do Owlbear Rodeo
-      setTimeout(() => {
-        if (!OBR.isReady) {
-          if (statusEl.innerText.includes('Conectando')) {
-            statusEl.innerText = "🟡 Modo Navegador (Fora do Owlbear)";
-            statusEl.className = "text-[9px] text-amber-400 font-medium";
-          }
-        }
-      }, 4000);
-
-      // Quando o Owlbear Rodeo der o sinal de pronto
-      OBR.onReady(async () => {
-        statusEl.innerText = "🟢 Conectado ao Owlbear";
-        statusEl.className = "text-[9px] text-green-400 font-semibold";
-
-        async function updateScene() {
-          try {
-            const ready = await OBR.scene.isReady();
-            if (ready) {
-              await refreshTokensList();
-              const sel = await OBR.player.getSelection();
-              if (sel && sel.length === 1) {
-                const items = await OBR.scene.items.getItems([sel[0]]);
-                if (items.length > 0) setBoundToken(items[0]);
-              }
-            }
-          } catch(e) {
-            console.error(e);
-          }
-        }
-
-        await updateScene();
-
-        OBR.scene.onReadyChange(async (ready) => {
-          if (ready) await updateScene();
-        });
-
-        OBR.player.onChange(async (player) => {
-          if (player.selection && player.selection.length === 1) {
-            const items = await OBR.scene.items.getItems([player.selection[0]]);
-            if (items.length > 0) setBoundToken(items[0]);
-          }
-        });
-
-        OBR.scene.items.onChange(async () => {
-          await refreshTokensList();
-        });
-      });
-    }
-
-    initSDK();
-
-    function extractTokenName(token) {
-      if (token.text && token.text.plainText && token.text.plainText.trim() !== '') {
-        return token.text.plainText.trim();
-      }
-      if (token.name && token.name.trim() !== '') {
-        return token.name.trim();
-      }
-      return `${token.layer || 'Token'} (${token.id.slice(0, 4)})`;
-    }
-
-    window.refreshTokensList = async function() {
-      if (!OBR || !OBR.isReady) return;
-      try {
-        const isReady = await OBR.scene.isReady();
-        if (!isReady) return;
-
-        const items = await OBR.scene.items.getItems();
-        const select = document.getElementById('tokenSelect');
-        const curVal = select.value;
-        select.innerHTML = '<option value="">-- Ficha Local (Nenhum Token) --</option>';
-
-        const tokens = items.filter(i => i.layer === "CHARACTER" || i.layer === "PROP" || i.layer === "MOUNT" || (i.name && i.name.trim() !== ''));
-
-        tokens.forEach(t => {
-          const name = extractTokenName(t);
-          const opt = document.createElement('option');
-          opt.value = t.id;
-          opt.textContent = name;
-          select.appendChild(opt);
-        });
-
-        if (selectedTokenId) {
-          select.value = selectedTokenId;
-        } else if (curVal) {
-          select.value = curVal;
-        }
-      } catch (err) {
-        console.error("Erro ao listar tokens:", err);
-      }
-    };
-
-    function setBoundToken(token) {
-      selectedTokenId = token.id;
-      const select = document.getElementById('tokenSelect');
-      const btnSync = document.getElementById('btnSyncToken');
-      
-      select.value = token.id;
-      btnSync.classList.remove('hidden');
-
-      const tokenName = extractTokenName(token);
-
-      if (token.metadata && token.metadata[SHEET_METADATA_KEY]) {
-        applyDataToSheet(token.metadata[SHEET_METADATA_KEY]);
-        showToast(`Token: ${tokenName}`);
-      } else {
-        const charName = document.getElementById('charName').value.trim();
-        if (!charName) {
-          document.getElementById('charName').value = tokenName;
-        }
-        showToast(`Vinculado: ${tokenName}`);
-      }
-    }
-
-    function clearBoundToken() {
-      selectedTokenId = null;
-      document.getElementById('tokenSelect').value = "";
-      document.getElementById('btnSyncToken').classList.add('hidden');
-      showToast("Modo local ativo.");
-    }
-
-    window.saveToSelectedToken = async function() {
-      if (!selectedTokenId || !OBR) {
-        showToast("Escolha um token no menu acima!", "fa-circle-exclamation");
-        return;
-      }
-      const sheetData = collectSheetData();
-      await OBR.scene.items.updateItems([selectedTokenId], (items) => {
-        for (let item of items) {
-          if (!item.metadata) item.metadata = {};
-          item.metadata[SHEET_METADATA_KEY] = sheetData;
-        }
-      });
-      showToast("Ficha salva no Token!");
-    };
-
-    window.autoSave = function() {
-      const data = collectSheetData();
-      localStorage.setItem('waymaker_local_sheet', JSON.stringify(data));
-      if (selectedTokenId && OBR && OBR.isReady) {
-        saveToSelectedToken();
-      }
-    };
-
-    function loadFromLocalStorage() {
-      const saved = localStorage.getItem('waymaker_local_sheet');
-      if (saved) {
-        try {
-          applyDataToSheet(JSON.parse(saved));
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-
+    // --- FUNÇÕES DA FICHA DEFINIDAS PRIMEIRO ---
     function renderAttributes() {
       const container = document.getElementById('attributesContainer');
+      if (!container) return;
       container.innerHTML = '';
       currentAttributes.forEach((attr, attrIdx) => {
         const row = document.createElement('div');
@@ -500,25 +304,16 @@
       });
     }
 
-    window.setAttributeDots = function(index, value) {
-      if (currentAttributes[index].dots === value && value > 1) {
-        currentAttributes[index].dots = value - 1;
-      } else {
-        currentAttributes[index].dots = Math.max(1, value);
-      }
-      renderAttributes();
-      autoSave();
-    };
-
     function renderSkills() {
       const container = document.getElementById('skillsContainer');
       const emptyState = document.getElementById('skillsEmptyState');
+      if (!container) return;
       container.innerHTML = '';
       
       if(currentSkills.length === 0) {
-        emptyState.style.display = 'block';
+        if (emptyState) emptyState.style.display = 'block';
       } else {
-        emptyState.style.display = 'none';
+        if (emptyState) emptyState.style.display = 'none';
         currentSkills.forEach((skill, skillIdx) => {
           const col = document.createElement('div');
           col.className = 'flex items-center justify-between p-1.5 rounded bg-slate-900 border border-slate-800 w-full';
@@ -540,31 +335,41 @@
       }
     }
 
-    window.setSkillDots = function(index, value) {
+    function setAttributeDots(index, value) {
+      if (currentAttributes[index].dots === value && value > 1) {
+        currentAttributes[index].dots = value - 1;
+      } else {
+        currentAttributes[index].dots = Math.max(1, value);
+      }
+      renderAttributes();
+      autoSave();
+    }
+
+    function setSkillDots(index, value) {
       if (currentSkills[index].dots === value) currentSkills[index].dots = value - 1;
       else currentSkills[index].dots = value;
       renderSkills();
       autoSave();
-    };
+    }
 
-    window.updateSkillName = function(index, newName) {
+    function updateSkillName(index, newName) {
       currentSkills[index].name = newName;
       autoSave();
-    };
+    }
     
-    window.addSkill = function() {
+    function addSkill() {
       currentSkills.push({ name: '', dots: 0 });
       renderSkills();
       autoSave();
-    };
+    }
     
-    window.removeSkill = function(index) {
+    function removeSkill(index) {
       currentSkills.splice(index, 1);
       renderSkills();
       autoSave();
-    };
+    }
 
-    window.addDynamicRow = function(containerId, ph1, ph2, ph3, ph4) {
+    function addDynamicRow(containerId, ph1, ph2, ph3, ph4) {
       const container = document.getElementById(containerId);
       const div = document.createElement('div');
       div.className = 'grid grid-cols-12 gap-1 items-center row-entry w-full';
@@ -586,7 +391,7 @@
       }
       container.appendChild(div);
       autoSave();
-    };
+    }
 
     function getDynamicRowsData(containerId) {
       const container = document.getElementById(containerId);
@@ -698,7 +503,7 @@
       restoreDynamicRowsData('itensContainer', d.lists?.itens, 'Item', 'Qtd', 'Descrição');
     }
 
-    window.exportJSON = function() {
+    function exportJSON() {
       const data = collectSheetData();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const link = document.createElement('a');
@@ -706,9 +511,9 @@
       link.download = `Ficha_${data.identity.name || 'Waymaker'}.json`;
       link.click();
       showToast('Ficha salva!');
-    };
+    }
 
-    window.importJSON = function(event) {
+    function importJSON(event) {
       const file = event.target.files[0];
       if (!file) return;
       const reader = new FileReader();
@@ -723,9 +528,9 @@
         }
       };
       reader.readAsText(file);
-    };
+    }
 
-    window.resetSheet = function() {
+    function resetSheet() {
       if (!confirm("Deseja realmente limpar a ficha?")) return;
       document.querySelectorAll('input, textarea').forEach(i => i.value = '');
       currentAttributes.forEach(a => a.dots = 1);
@@ -735,15 +540,240 @@
       ['weaponsContainer', 'tecnicasPoderesContainer', 'itensContainer'].forEach(id => document.getElementById(id).innerHTML = '');
       autoSave();
       showToast('Ficha reiniciada!');
-    };
+    }
+
+    function autoSave() {
+      const data = collectSheetData();
+      localStorage.setItem('waymaker_local_sheet', JSON.stringify(data));
+      if (selectedTokenId && OBR && OBR.isReady) {
+        saveToSelectedToken();
+      }
+    }
+
+    function loadFromLocalStorage() {
+      const saved = localStorage.getItem('waymaker_local_sheet');
+      if (saved) {
+        try {
+          applyDataToSheet(JSON.parse(saved));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
 
     function showToast(msg, icon = 'fa-circle-check') {
       const t = document.getElementById('toast');
+      if (!t) return;
       document.getElementById('toastMessage').innerText = msg;
       document.getElementById('toastIcon').className = `fa-solid ${icon} text-purple-400`;
       t.classList.remove('translate-y-16', 'opacity-0');
       setTimeout(() => t.classList.add('translate-y-16', 'opacity-0'), 2500);
     }
+
+    function extractTokenName(token) {
+      if (token.text && token.text.plainText && token.text.plainText.trim() !== '') {
+        return token.text.plainText.trim();
+      }
+      if (token.name && token.name.trim() !== '') {
+        return token.name.trim();
+      }
+      return `${token.layer || 'Token'} (${token.id.slice(0, 4)})`;
+    }
+
+    function setBoundToken(token) {
+      selectedTokenId = token.id;
+      const select = document.getElementById('tokenSelect');
+      const btnSync = document.getElementById('btnSyncToken');
+      
+      if (select) select.value = token.id;
+      if (btnSync) btnSync.classList.remove('hidden');
+
+      const tokenName = extractTokenName(token);
+
+      if (token.metadata && token.metadata[SHEET_METADATA_KEY]) {
+        applyDataToSheet(token.metadata[SHEET_METADATA_KEY]);
+        showToast(`Token: ${tokenName}`);
+      } else {
+        const charName = document.getElementById('charName').value.trim();
+        if (!charName) {
+          document.getElementById('charName').value = tokenName;
+        }
+        showToast(`Vinculado: ${tokenName}`);
+      }
+    }
+
+    function clearBoundToken() {
+      selectedTokenId = null;
+      const select = document.getElementById('tokenSelect');
+      const btnSync = document.getElementById('btnSyncToken');
+      if (select) select.value = "";
+      if (btnSync) btnSync.classList.add('hidden');
+      showToast("Modo local ativo.");
+    }
+
+    async function saveToSelectedToken() {
+      if (!selectedTokenId || !OBR) {
+        showToast("Escolha um token no menu acima!", "fa-circle-exclamation");
+        return;
+      }
+      const sheetData = collectSheetData();
+      await OBR.scene.items.updateItems([selectedTokenId], (items) => {
+        for (let item of items) {
+          if (!item.metadata) item.metadata = {};
+          item.metadata[SHEET_METADATA_KEY] = sheetData;
+        }
+      });
+      showToast("Ficha salva no Token!");
+    }
+
+    async function refreshTokensList() {
+      if (!OBR || !OBR.isReady) return;
+      try {
+        const isReady = await OBR.scene.isReady();
+        if (!isReady) return;
+
+        const items = await OBR.scene.items.getItems();
+        const select = document.getElementById('tokenSelect');
+        if (!select) return;
+        const curVal = select.value;
+        select.innerHTML = '<option value="">-- Ficha Local (Nenhum Token) --</option>';
+
+        const tokens = items.filter(i => i.layer === "CHARACTER" || i.layer === "PROP" || i.layer === "MOUNT" || (i.name && i.name.trim() !== ''));
+
+        tokens.forEach(t => {
+          const name = extractTokenName(t);
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = name;
+          select.appendChild(opt);
+        });
+
+        if (selectedTokenId) {
+          select.value = selectedTokenId;
+        } else if (curVal) {
+          select.value = curVal;
+        }
+      } catch (err) {
+        console.error("Erro ao listar tokens:", err);
+      }
+    }
+
+    // Exporta todas as funções para acesso nos eventos inline do HTML
+    window.renderAttributes = renderAttributes;
+    window.renderSkills = renderSkills;
+    window.setAttributeDots = setAttributeDots;
+    window.setSkillDots = setSkillDots;
+    window.updateSkillName = updateSkillName;
+    window.addSkill = addSkill;
+    window.removeSkill = removeSkill;
+    window.addDynamicRow = addDynamicRow;
+    window.exportJSON = exportJSON;
+    window.importJSON = importJSON;
+    window.resetSheet = resetSheet;
+    window.autoSave = autoSave;
+    window.saveToSelectedToken = saveToSelectedToken;
+    window.refreshTokensList = refreshTokensList;
+
+    // --- EXECUÇÃO IMEDIATA DA INTERFACE ---
+    renderAttributes();
+    renderSkills();
+    loadFromLocalStorage();
+
+    document.getElementById('tokenSelect').addEventListener('change', async (e) => {
+      const tokenId = e.target.value;
+      if (!tokenId) {
+        clearBoundToken();
+      } else {
+        if (!OBR) return;
+        try {
+          const items = await OBR.scene.items.getItems([tokenId]);
+          if (items.length > 0) setBoundToken(items[0]);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    });
+
+    // --- CARREGAMENTO DO SDK DO OWLBEAR RODEO ---
+    async function initSDK() {
+      const statusEl = document.getElementById('connectionStatus');
+      const providers = [
+        "https://esm.sh/@owlbear-rodeo/sdk",
+        "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk/+esm",
+        "https://cdn.skypack.dev/@owlbear-rodeo/sdk"
+      ];
+
+      for (let i = 0; i < providers.length; i++) {
+        const url = providers[i];
+        try {
+          statusEl.innerText = `Baixando SDK (${i + 1}/${providers.length})...`;
+          const mod = await import(url);
+          OBR = mod.default || mod.OBR || mod;
+          if (OBR && typeof OBR.onReady === 'function') {
+            break;
+          }
+        } catch (err) {
+          console.warn(`Provedor ${url} falhou:`, err);
+        }
+      }
+
+      if (!OBR || typeof OBR.onReady !== 'function') {
+        statusEl.innerText = "🔴 Falha ao baixar SDK";
+        statusEl.className = "text-[9px] text-red-400 font-bold";
+        return;
+      }
+
+      statusEl.innerText = "Conectando à mesa...";
+
+      setTimeout(() => {
+        if (!OBR.isReady) {
+          if (statusEl.innerText.includes('Conectando')) {
+            statusEl.innerText = "🟡 Modo Navegador (Fora do Owlbear)";
+            statusEl.className = "text-[9px] text-amber-400 font-medium";
+          }
+        }
+      }, 4000);
+
+      OBR.onReady(async () => {
+        statusEl.innerText = "🟢 Conectado ao Owlbear";
+        statusEl.className = "text-[9px] text-green-400 font-semibold";
+
+        async function updateScene() {
+          try {
+            const ready = await OBR.scene.isReady();
+            if (ready) {
+              await refreshTokensList();
+              const sel = await OBR.player.getSelection();
+              if (sel && sel.length === 1) {
+                const items = await OBR.scene.items.getItems([sel[0]]);
+                if (items.length > 0) setBoundToken(items[0]);
+              }
+            }
+          } catch(e) {
+            console.error(e);
+          }
+        }
+
+        await updateScene();
+
+        OBR.scene.onReadyChange(async (ready) => {
+          if (ready) await updateScene();
+        });
+
+        OBR.player.onChange(async (player) => {
+          if (player.selection && player.selection.length === 1) {
+            const items = await OBR.scene.items.getItems([player.selection[0]]);
+            if (items.length > 0) setBoundToken(items[0]);
+          }
+        });
+
+        OBR.scene.items.onChange(async () => {
+          await refreshTokensList();
+        });
+      });
+    }
+
+    initSDK();
   </script>
 </body>
 </html>
