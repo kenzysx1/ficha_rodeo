@@ -277,23 +277,27 @@
     let selectedTokenId = null;
     let autoSaveTimeout = null;
 
-    let currentAttributes = [
-      { id: 'fis', name: 'FIS (Físico)', dots: 1 },
-      { id: 'ref', name: 'REF (Reflexos)', dots: 1 },
-      { id: 'vig', name: 'VIG (Vigor)', dots: 1 },
-      { id: 'int', name: 'INT (Inteligência)', dots: 1 },
-      { id: 'per', name: 'PER (Percepção)', dots: 1 },
-      { id: 'car', name: 'CAR (Carisma)', dots: 1 }
-    ];
+    function getDefaultAttributes() {
+      return [
+        { id: 'fis', name: 'FIS (Físico)', dots: 1 },
+        { id: 'ref', name: 'REF (Reflexos)', dots: 1 },
+        { id: 'vig', name: 'VIG (Vigor)', dots: 1 },
+        { id: 'int', name: 'INT (Inteligência)', dots: 1 },
+        { id: 'per', name: 'PER (Percepção)', dots: 1 },
+        { id: 'car', name: 'CAR (Carisma)', dots: 1 }
+      ];
+    }
+
+    let currentAttributes = getDefaultAttributes();
     let currentSkills = [];
 
-    // --- LIMPA A FICHA COMPLETAMENTE ---
+    // --- LIMPA A FICHA COMPLETAMENTE (COM CÓPIA NOVA DESVINCULADA) ---
     function clearSheetForm(defaultName = '') {
       document.querySelectorAll('#sheetContainer input, #sheetContainer textarea').forEach(i => i.value = '');
       if (defaultName) {
         document.getElementById('charName').value = defaultName;
       }
-      currentAttributes.forEach(a => a.dots = 1);
+      currentAttributes = getDefaultAttributes();
       currentSkills = [];
       renderAttributes();
       renderSkills();
@@ -486,8 +490,12 @@
       };
     }
 
-    function applyDataToSheet(d) {
-      if (!d) return;
+    // --- DESCONGELA OS DADOS VINDOS DO OWLBEAR RODEO ---
+    function applyDataToSheet(rawData) {
+      if (!rawData) return;
+      // Deep clone para desvincular de qualquer Object.freeze da memória
+      const d = JSON.parse(JSON.stringify(rawData));
+
       document.getElementById('charName').value = d.identity?.name || '';
       document.getElementById('charEspecie').value = d.identity?.especie || '';
       document.getElementById('charArquetipo').value = d.identity?.arquetipo || '';
@@ -510,8 +518,8 @@
       document.getElementById('statDefesa').value = d.stats?.defesas?.[1] || '';
       document.getElementById('statResolucao').value = d.stats?.defesas?.[2] || '';
 
-      if (d.attributes) currentAttributes = d.attributes;
-      if (d.skills) currentSkills = d.skills;
+      currentAttributes = d.attributes ? JSON.parse(JSON.stringify(d.attributes)) : getDefaultAttributes();
+      currentSkills = d.skills ? JSON.parse(JSON.stringify(d.skills)) : [];
       renderAttributes();
       renderSkills();
 
@@ -526,7 +534,7 @@
       
       clearTimeout(autoSaveTimeout);
       autoSaveTimeout = setTimeout(async () => {
-        const sheetData = collectSheetData();
+        const sheetData = JSON.parse(JSON.stringify(collectSheetData()));
         await OBR.scene.items.updateItems([selectedTokenId], (items) => {
           for (let item of items) {
             if (!item.metadata) item.metadata = {};
@@ -534,7 +542,6 @@
           }
         });
 
-        // Mostra o feedback visual discreto "Salvo"
         const badge = document.getElementById('saveBadge');
         if (badge) {
           badge.classList.remove('opacity-0');
@@ -553,9 +560,8 @@
       return `${token.layer || 'Token'} (${token.id.slice(0, 4)})`;
     }
 
-    // --- ALTERNA PARA O TOKEN ESCOLHIDO (ISOLAMENTO TOTAL) ---
+    // --- ALTERNA PARA O TOKEN ESCOLHIDO COM ISOLAMENTO TOTAL ---
     async function setBoundToken(token) {
-      // Se clicou no mesmo que já está aberto, não faz nada
       if (selectedTokenId === token.id) return;
 
       selectedTokenId = token.id;
@@ -564,14 +570,14 @@
 
       const tokenName = extractTokenName(token);
 
-      // Se o token já tiver a sua própria ficha salva nele, carrega
+      // Se o token já tiver a sua própria ficha salva, carrega desvinculado de freeze
       if (token.metadata && token.metadata[SHEET_METADATA_KEY]) {
         applyDataToSheet(token.metadata[SHEET_METADATA_KEY]);
         showToast(`Carregado: ${tokenName}`);
       } else {
-        // Se o token for novo, RESETA A FICHA e preenche apenas o nome dele!
+        // Se o token for novo, RESETA A FICHA limpa para ele
         clearSheetForm(tokenName);
-        autoSave(); // Grava a nova ficha vazia direto nele
+        autoSave();
         showToast(`Nova ficha: ${tokenName}`);
       }
     }
