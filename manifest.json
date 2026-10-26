@@ -1,9 +1,9 @@
 {
   "name": "Waymaker RPG Sheet",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "manifest_version": 1,
   "author": "Waymaker Engine",
-  "description": "Ficha de personagem interativa para Waymaker RPG.",
+  "description": "Ficha de personagem para Waymaker RPG.",
   "icon": "https://kenzysx1.github.io/ficha_rodeo/icon.svg",
   "action": {
     "title": "Waymaker Ficha",
