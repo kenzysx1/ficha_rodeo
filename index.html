@@ -270,8 +270,9 @@
     <span id="toastMessage"></span>
   </div>
 
-  <script>
-    let OBR = null;
+  <script type="module">
+    import OBR from "https://esm.sh/@owlbear-rodeo/sdk";
+
     const SHEET_METADATA_KEY = "com.waymaker.sheet/data";
     let selectedTokenId = null;
 
@@ -285,7 +286,7 @@
     ];
     let currentSkills = [];
 
-    // --- FUNÇÕES DA FICHA DEFINIDAS PRIMEIRO ---
+    // --- FUNÇÕES DA FICHA ---
     function renderAttributes() {
       const container = document.getElementById('attributesContainer');
       if (!container) return;
@@ -310,7 +311,7 @@
       if (!container) return;
       container.innerHTML = '';
       
-      if(currentSkills.length === 0) {
+      if (currentSkills.length === 0) {
         if (emptyState) emptyState.style.display = 'block';
       } else {
         if (emptyState) emptyState.style.display = 'none';
@@ -399,7 +400,7 @@
       const data = [];
       rows.forEach(row => {
         const inputs = row.querySelectorAll('input');
-        if(Array.from(inputs).some(i => i.value.trim() !== '')) {
+        if (Array.from(inputs).some(i => i.value.trim() !== '')) {
           data.push({ 
             col1: inputs[0]?.value || '', 
             col2: inputs[1]?.value || '', 
@@ -414,7 +415,7 @@
     function restoreDynamicRowsData(containerId, data, ph1, ph2, ph3, ph4) {
       const container = document.getElementById(containerId);
       container.innerHTML = '';
-      if(data && data.length > 0) {
+      if (data && data.length > 0) {
         data.forEach(item => {
           const div = document.createElement('div');
           div.className = 'grid grid-cols-12 gap-1 items-center row-entry w-full';
@@ -658,9 +659,7 @@
       }
     }
 
-    // Exporta todas as funções para acesso nos eventos inline do HTML
-    window.renderAttributes = renderAttributes;
-    window.renderSkills = renderSkills;
+    // Exporta todas as funções para acesso nos botões do HTML
     window.setAttributeDots = setAttributeDots;
     window.setSkillDots = setSkillDots;
     window.updateSkillName = updateSkillName;
@@ -674,106 +673,81 @@
     window.saveToSelectedToken = saveToSelectedToken;
     window.refreshTokensList = refreshTokensList;
 
-    // --- EXECUÇÃO IMEDIATA DA INTERFACE ---
+    // Renderiza a ficha
     renderAttributes();
     renderSkills();
     loadFromLocalStorage();
 
-    document.getElementById('tokenSelect').addEventListener('change', async (e) => {
-      const tokenId = e.target.value;
-      if (!tokenId) {
-        clearBoundToken();
-      } else {
-        if (!OBR) return;
-        try {
-          const items = await OBR.scene.items.getItems([tokenId]);
-          if (items.length > 0) setBoundToken(items[0]);
-        } catch (err) {
-          console.error(err);
-        }
-      }
-    });
-
-    // --- CARREGAMENTO DO SDK DO OWLBEAR RODEO ---
-    async function initSDK() {
-      const statusEl = document.getElementById('connectionStatus');
-      const providers = [
-        "https://esm.sh/@owlbear-rodeo/sdk",
-        "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk/+esm",
-        "https://cdn.skypack.dev/@owlbear-rodeo/sdk"
-      ];
-
-      for (let i = 0; i < providers.length; i++) {
-        const url = providers[i];
-        try {
-          statusEl.innerText = `Baixando SDK (${i + 1}/${providers.length})...`;
-          const mod = await import(url);
-          OBR = mod.default || mod.OBR || mod;
-          if (OBR && typeof OBR.onReady === 'function') {
-            break;
-          }
-        } catch (err) {
-          console.warn(`Provedor ${url} falhou:`, err);
-        }
-      }
-
-      if (!OBR || typeof OBR.onReady !== 'function') {
-        statusEl.innerText = "🔴 Falha ao baixar SDK";
-        statusEl.className = "text-[9px] text-red-400 font-bold";
-        return;
-      }
-
-      statusEl.innerText = "Conectando à mesa...";
-
-      setTimeout(() => {
-        if (!OBR.isReady) {
-          if (statusEl.innerText.includes('Conectando')) {
-            statusEl.innerText = "🟡 Modo Navegador (Fora do Owlbear)";
-            statusEl.className = "text-[9px] text-amber-400 font-medium";
-          }
-        }
-      }, 4000);
-
-      OBR.onReady(async () => {
-        statusEl.innerText = "🟢 Conectado ao Owlbear";
-        statusEl.className = "text-[9px] text-green-400 font-semibold";
-
-        async function updateScene() {
+    const selectEl = document.getElementById('tokenSelect');
+    if (selectEl) {
+      selectEl.addEventListener('change', async (e) => {
+        const tokenId = e.target.value;
+        if (!tokenId) {
+          clearBoundToken();
+        } else {
+          if (!OBR) return;
           try {
-            const ready = await OBR.scene.isReady();
-            if (ready) {
-              await refreshTokensList();
-              const sel = await OBR.player.getSelection();
-              if (sel && sel.length === 1) {
-                const items = await OBR.scene.items.getItems([sel[0]]);
-                if (items.length > 0) setBoundToken(items[0]);
-              }
-            }
-          } catch(e) {
-            console.error(e);
+            const items = await OBR.scene.items.getItems([tokenId]);
+            if (items.length > 0) setBoundToken(items[0]);
+          } catch (err) {
+            console.error(err);
           }
         }
-
-        await updateScene();
-
-        OBR.scene.onReadyChange(async (ready) => {
-          if (ready) await updateScene();
-        });
-
-        OBR.player.onChange(async (player) => {
-          if (player.selection && player.selection.length === 1) {
-            const items = await OBR.scene.items.getItems([player.selection[0]]);
-            if (items.length > 0) setBoundToken(items[0]);
-          }
-        });
-
-        OBR.scene.items.onChange(async () => {
-          await refreshTokensList();
-        });
       });
     }
 
-    initSDK();
+    // --- CONEXÃO COM O OWLBEAR RODEO ---
+    const statusEl = document.getElementById('connectionStatus');
+    if (statusEl) {
+      statusEl.innerText = "Conectando à mesa...";
+    }
+
+    setTimeout(() => {
+      if (!OBR.isReady && statusEl && statusEl.innerText.includes('Conectando')) {
+        statusEl.innerText = "🟡 Modo Navegador (Fora do Owlbear)";
+        statusEl.className = "text-[9px] text-amber-400 font-medium";
+      }
+    }, 4000);
+
+    OBR.onReady(async () => {
+      if (statusEl) {
+        statusEl.innerText = "🟢 Conectado ao Owlbear";
+        statusEl.className = "text-[9px] text-green-400 font-semibold";
+      }
+
+      async function updateScene() {
+        try {
+          const ready = await OBR.scene.isReady();
+          if (ready) {
+            await refreshTokensList();
+            const sel = await OBR.player.getSelection();
+            if (sel && sel.length === 1) {
+              const items = await OBR.scene.items.getItems([sel[0]]);
+              if (items.length > 0) setBoundToken(items[0]);
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      await updateScene();
+
+      OBR.scene.onReadyChange(async (ready) => {
+        if (ready) await updateScene();
+      });
+
+      OBR.player.onChange(async (player) => {
+        if (player.selection && player.selection.length === 1) {
+          const items = await OBR.scene.items.getItems([player.selection[0]]);
+          if (items.length > 0) setBoundToken(items[0]);
+        }
+      });
+
+      OBR.scene.items.onChange(async () => {
+        await refreshTokensList();
+      });
+    });
   </script>
 </body>
 </html>
