@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waymaker RPG - Owlbear Rodeo Extension</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            rpg: {
+              bg: '#090d16', card: '#111827', border: '#1e293b',
+              accent: '#8b5cf6', accentHover: '#7c3aed'
+            }
+          },
+          fontFamily: {
+            header: ['Cinzel', 'serif'],
+            sans: ['Inter', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #090d16; color: #e2e8f0; }
+    .font-header { font-family: 'Cinzel', serif; }
+
+    .dot {
+      width: 15px; height: 15px; border-radius: 50%;
+      border: 2px solid #64748b; cursor: pointer;
+      transition: all 0.2s ease; display: inline-block;
+      background-color: transparent;
+    }
+    .dot.filled {
+      background-color: #8b5cf6; border-color: #a78bfa;
+      box-shadow: 0 0 6px rgba(139, 92, 246, 0.7);
+    }
+    .dot:hover { border-color: #c4b5fd; transform: scale(1.15); }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #0b0f19; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+  </style>
+</head>
+<body class="w-full min-h-screen p-3 flex flex-col justify-start select-none">
+
+  <!-- BARRA DE VÍNCULO DO OWLBEAR RODEO -->
+  <header class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 mb-3 shadow-lg flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center space-x-2">
+      <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow">
+        W
+      </div>
+      <div>
+        <h1 class="font-header text-xs font-bold text-slate-100 tracking-wider">WAYMAKER</h1>
+        <p id="tokenStatus" class="text-[10px] text-slate-400 font-medium">Modo Local (Nenhum Token)</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-1.5 flex-wrap">
+      <button id="btnSyncToken" title="Salvar no Token selecionado no mapa" class="hidden px-2.5 py-1 bg-purple-700/60 hover:bg-purple-600 text-purple-200 text-xs rounded border border-purple-500/40 transition flex items-center gap-1 font-semibold">
+        <i class="fa-solid fa-cloud-arrow-up"></i> Salvar no Token
+      </button>
+      <button onclick="openDiceModal()" class="px-2.5 py-1 bg-indigo-600/40 hover:bg-indigo-600/70 text-indigo-200 border border-indigo-500/50 text-xs rounded transition flex items-center gap-1 font-semibold">
+        <i class="fa-solid fa-dice-d20"></i> Rolar
+      </button>
+      <button onclick="exportJSON()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded border border-slate-700 transition" title="Exportar JSON">
+        <i class="fa-solid fa-download"></i>
+      </button>
+      <label class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded border border-slate-700 cursor-pointer transition" title="Importar JSON">
+        <i class="fa-solid fa-upload"></i>
+        <input type="file" id="jsonInput" accept=".json" class="hidden" onchange="importJSON(event)">
+      </label>
+      <button onclick="resetSheet()" class="px-2 py-1 bg-red-950/40 hover:bg-red-900/60 text-red-400 text-xs rounded border border-red-800/40 transition" title="Limpar Ficha">
+        <i class="fa-solid fa-trash"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- FICHA PRINCIPAL -->
+  <main class="w-full flex-grow space-y-3 pb-4">
+    <div class="bg-slate-900/90 border border-slate-800/90 rounded-xl p-3 sm:p-4 shadow-xl">
+      
+      <!-- IDENTIDADE BÁSICA -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+        <div class="col-span-2">
+          <label class="block text-[9px] font-bold text-slate-400 uppercase mb-0.5">Nome</label>
+          <input type="text" id="charName" onchange="autoSave()" class="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-100 text-xs focus:outline-none focus:border-purple-500">
+        </div>
+        <div>
+          <label class="block text-[9px] font-bold text-slate-400 uppercase mb-0.5">Espécie</label>
+          <input type="text" id="charEspecie" onchange="autoSave()" class="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-100 text-xs focus:outline-none focus:border-purple-500">
+        </div>
+        <div>
+          <label class="block text-[9px] font-bold text-slate-400 uppercase mb-0.5">Arquétipo</label>
+          <input type="text" id="charArquetipo" onchange="autoSave()" class="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-100 text-xs focus:outline-none focus:border-purple-500">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3 pb-3 border-b border-slate-800/70">
+        <div>
+          <label class="block text-[9px] font-bold text-slate-400 uppercase mb-0.5">Tamanho</label>
+          <input type="text" id="charTamanho" onchange="autoSave()" class="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-100 text-xs focus:outline-none focus:border-purple-500">
+        </div>
+        <div>
+          <label class="block text-[9px] font-bold text-slate-400 uppercase mb-0.5">Velocidade</label>
+          <input type="text" id="charVelocidade" onchange="autoSave()" class="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-100 text-xs focus:outline-none focus:border-purple-500">
+        </div>
+        <div>
+          <label class="block text-[9px] font-bold text-amber-400 uppercase mb-0.5">XP (Atual / Total)</label>
+          <div class="flex gap-1">
+            <input type="text" id="charExpAtual" placeholder="0" onchange="autoSave()" class="w-1/2 bg-slate-950 border border-slate-800 rounded px-1 py-1 text-amber-300 text-xs text-center font-bold">
+            <input type="text" id="charExpTotal" placeholder="0" onchange="autoSave()" class="w-1/2 bg-slate-950 border border-slate-800 rounded px-1 py-1 text-slate-400 text-xs text-center font-bold">
+          </div>
+        </div>
+        <div>
+          <label class="block text-[9px] font-bold text-emerald-400 uppercase mb-0.5">Moedas</label>
+          <input type="text" id="charMoedas" onchange="autoSave()" class="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-emerald-300 text-xs font-bold text-center">
+        </div>
+      </div>
+
+      <!-- STATUS & COMBATE -->
+      <div class="grid grid-cols-3 gap-2 mb-3">
+        <!-- VIDA -->
+        <div class="bg-red-950/30 border border-red-900/40 rounded-lg p-2 text-center">
+          <span class="block text-[9px] font-bold text-red-400 uppercase mb-0.5">Vida</span>
+          <div class="flex items-center justify-center gap-1">
+            <input type="number" id="vidaAtual" onchange="autoSave()" class="w-10 bg-slate-900 text-center text-xs font-bold text-red-200 rounded border border-red-800/50 py-0.5">
+            <span class="text-slate-600 text-xs font-bold">/</span>
+            <input type="number" id="vidaMax" onchange="autoSave()" class="w-10 bg-slate-900 text-center text-xs font-bold text-slate-400 rounded border border-slate-800 py-0.5">
+          </div>
+        </div>
+        <!-- ESTAMINA -->
+        <div class="bg-amber-950/30 border border-amber-900/40 rounded-lg p-2 text-center">
+          <span class="block text-[9px] font-bold text-amber-400 uppercase mb-0.5">Estamina</span>
+          <div class="flex items-center justify-center gap-1">
+            <input type="number" id="estaminaAtual" onchange="autoSave()" class="w-10 bg-slate-900 text-center text-xs font-bold text-amber-200 rounded border border-amber-800/50 py-0.5">
+            <span class="text-slate-600 text-xs font-bold">/</span>
+            <input type="number" id="estaminaMax" onchange="autoSave()" class="w-10 bg-slate-900 text-center text-xs font-bold text-slate-400 rounded border border-slate-800 py-0.5">
+          </div>
+        </div>
+        <!-- MÍSTICO -->
+        <div class="bg-blue-950/30 border border-blue-900/40 rounded-lg p-2 text-center">
+          <span class="block text-[9px] font-bold text-blue-400 uppercase mb-0.5">Místico</span>
+          <div class="flex items-center justify-center gap-1">
+            <input type="number" id="misticoAtual" onchange="autoSave()" class="w-10 bg-slate-900 text-center text-xs font-bold text-blue-200 rounded border border-blue-800/50 py-0.5">
+            <span class="text-slate-600 text-xs font-bold">/</span>
+            <input type="number" id="misticoMax" onchange="autoSave()" class="w-10 bg-slate-900 text-center text-xs font-bold text-slate-400 rounded border border-slate-800 py-0.5">
+          </div>
+        </div>
+      </div>
+
+      <!-- DEFESAS -->
+      <div class="grid grid-cols-3 gap-2 mb-3 pb-3 border-b border-slate-800/70">
+        <div class="text-center bg-slate-950 p-1.5 rounded border border-slate-800">
+          <span class="block text-[8px] text-slate-400 font-bold uppercase">Armadura</span>
+          <input type="text" id="statArmadura" onchange="autoSave()" class="w-full text-center bg-transparent font-bold text-slate-100 text-xs focus:outline-none">
+        </div>
+        <div class="text-center bg-slate-950 p-1.5 rounded border border-slate-800">
+          <span class="block text-[8px] text-slate-400 font-bold uppercase">Defesa</span>
+          <input type="text" id="statDefesa" onchange="autoSave()" class="w-full text-center bg-transparent font-bold text-slate-100 text-xs focus:outline-none">
+        </div>
+        <div class="text-center bg-slate-950 p-1.5 rounded border border-slate-800">
+          <span class="block text-[8px] text-slate-400 font-bold uppercase">Resolução</span>
+          <input type="text" id="statResolucao" onchange="autoSave()" class="w-full text-center bg-transparent font-bold text-slate-100 text-xs focus:outline-none">
+        </div>
+      </div>
+
+      <!-- ATRIBUTOS -->
+      <div class="mb-3 bg-slate-950/60 border border-slate-800 rounded-lg p-2.5">
+        <h2 class="font-header text-xs font-bold text-purple-300 tracking-wider mb-2 border-b border-slate-800/80 pb-1 flex justify-between">
+          <span><i class="fa-solid fa-dna text-purple-400 mr-1"></i> ATRIBUTOS</span>
+          <span class="text-[9px] text-slate-500 font-sans font-normal">(1 a 6)</span>
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5" id="attributesContainer"></div>
+      </div>
+
+      <!-- PERÍCIAS -->
+      <div class="mb-3 bg-slate-950/60 border border-slate-800 rounded-lg p-2.5">
+        <div class="flex items-center justify-between mb-2 border-b border-slate-800/80 pb-1">
+          <h2 class="font-header text-xs font-bold text-indigo-300 tracking-wider">
+            <i class="fa-solid fa-list-check text-indigo-400 mr-1"></i> PERÍCIAS
+          </h2>
+          <button onclick="addSkill()" class="px-2 py-0.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 rounded text-[10px] transition">
+            + Nova
+          </button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5" id="skillsContainer"></div>
+        <p id="skillsEmptyState" class="text-[10px] text-slate-500 text-center py-2 italic">Nenhuma perícia cadastrada.</p>
+      </div>
+
+      <!-- VANTAGENS / DESVANTAGENS -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+        <div>
+          <label class="block text-[9px] font-bold text-green-400 uppercase mb-0.5">Vantagens</label>
+          <textarea id="charVantagens" onchange="autoSave()" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:outline-none focus:border-green-500 resize-none"></textarea>
+        </div>
+        <div>
+          <label class="block text-[9px] font-bold text-red-400 uppercase mb-0.5">Desvantagens</label>
+          <textarea id="charDesvantagens" onchange="autoSave()" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs focus:outline-none focus:border-red-500 resize-none"></textarea>
+        </div>
+      </div>
+
+      <!-- ABAS DINÂMICAS: ARMAS, HABILIDADES E ITENS -->
+      <div class="space-y-2">
+        <!-- Armas -->
+        <div class="bg-slate-950/40 border border-slate-800 rounded-lg p-2">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-1 mb-2">
+            <span class="font-header text-[10px] font-bold text-amber-400"><i class="fa-solid fa-khanda mr-1"></i> ARMAS</span>
+            <button onclick="addDynamicRow('weaponsContainer', 'Arma', 'Dano', 'Propriedades', 'Tags')" class="text-[9px] text-amber-300 bg-amber-900/30 px-1.5 py-0.5 rounded border border-amber-800/50">+ Arma</button>
+          </div>
+          <div class="space-y-1.5" id="weaponsContainer"></div>
+        </div>
+
+        <!-- Habilidades -->
+        <div class="bg-slate-950/40 border border-slate-800 rounded-lg p-2">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-1 mb-2">
+            <span class="font-header text-[10px] font-bold text-blue-400"><i class="fa-solid fa-bolt mr-1"></i> HABILIDADES / TÉCNICAS</span>
+            <button onclick="addDynamicRow('tecnicasPoderesContainer', 'Nome', 'Custo', 'Efeito', 'Tags')" class="text-[9px] text-blue-300 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-800/50">+ Habilidade</button>
+          </div>
+          <div class="space-y-1.5" id="tecnicasPoderesContainer"></div>
+        </div>
+
+        <!-- Itens -->
+        <div class="bg-slate-950/40 border border-slate-800 rounded-lg p-2">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-1 mb-2">
+            <span class="font-header text-[10px] font-bold text-slate-300"><i class="fa-solid fa-backpack mr-1"></i> ITENS</span>
+            <button onclick="addDynamicRow('itensContainer', 'Item', 'Qtd', 'Descrição')" class="text-[9px] text-slate-300 bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">+ Item</button>
+          </div>
+          <div class="space-y-1.5" id="itensContainer"></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- DICE ROLLER MODAL -->
+  <div id="diceModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden select-none overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-xl p-4 shadow-2xl relative my-auto">
+      <button onclick="closeDiceModal()" class="absolute top-3 right-3 text-slate-400 hover:text-white">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+
+      <h3 class="font-header text-sm font-bold text-purple-300 mb-3"><i class="fa-solid fa-dice-d20 mr-1"></i> ROLAGEM DE DADOS</h3>
+      
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <div class="col-span-2">
+          <label class="block text-[9px] font-bold text-slate-400 mb-0.5">Atributo Base</label>
+          <select id="diceAttrSelect" class="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200"></select>
+        </div>
+        <div class="col-span-2">
+          <label class="block text-[9px] font-bold text-slate-400 mb-0.5">Perícia (Opcional)</label>
+          <select id="diceSkillSelect" class="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200"></select>
+        </div>
+        <div>
+          <label class="block text-[9px] font-bold text-slate-400 mb-0.5">Modificador</label>
+          <select id="diceMod" class="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200">
+            <option value="n">Normal</option>
+            <option value="v">Vantagem (+)</option>
+            <option value="d">Desvantagem (-)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[9px] font-bold text-slate-400 mb-0.5">Dificuldade (DC)</label>
+          <input type="number" id="diceDC" value="1" min="1" class="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200">
+        </div>
+        <div class="col-span-2 pt-1">
+          <button onclick="rollDicePool()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg shadow transition">ROLAR DADOS</button>
+        </div>
+      </div>
+      
+      <div id="diceResultBox" class="hidden bg-slate-950 border rounded-xl p-3 text-center transition-colors">
+        <h4 id="diceResultTitle" class="text-xs font-bold uppercase mb-1"></h4>
+        <p id="diceResultDesc" class="text-[10px] text-slate-400 mb-2"></p>
+        
+        <div id="dicePoolVisual" class="flex flex-wrap justify-center gap-1.5 my-2"></div>
+        
+        <div class="grid grid-cols-4 gap-1.5 text-center text-[10px] mb-2">
+          <div class="bg-slate-900 rounded p-1 border border-slate-800"><span class="block text-slate-500">Dados</span><strong id="resDados" class="text-slate-200"></strong></div>
+          <div class="bg-slate-900 rounded p-1 border border-slate-800"><span class="block text-slate-500">DC</span><strong id="resDC" class="text-slate-200"></strong></div>
+          <div class="bg-slate-900 rounded p-1 border border-slate-800"><span class="block text-slate-500">Sucessos</span><strong id="resSucessos" class="text-slate-200"></strong></div>
+          <div class="bg-slate-900 rounded p-1 border border-slate-800"><span class="block text-slate-500">Compl.</span><strong id="resComplicacoes" class="text-slate-200"></strong></div>
+        </div>
+        
+        <button id="btnPagarPreco" onclick="pagarPreco()" class="hidden w-full py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded shadow transition flex items-center justify-center gap-1">
+          <i class="fa-solid fa-scale-balanced"></i> Pagar o Preço
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-3 right-3 bg-slate-800 text-slate-100 border border-purple-500/50 px-3 py-2 rounded-lg shadow-xl transition-all duration-300 transform translate-y-16 opacity-0 z-50 flex items-center gap-2 text-xs">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-purple-400"></i>
+    <span id="toastMessage"></span>
+  </div>
+
+  <!-- INTEGRAÇÃO OWLBEAR RODEO SDK (ESM) -->
+  <script type="module">
+    import OBR from "https://esm.sh/@owlbear-rodeo/sdk";
+
+    const SHEET_METADATA_KEY = "com.waymaker.sheet/data";
+    let selectedTokenId = null;
+
+    let currentAttributes = [
+      { id: 'fis', name: 'FIS (Físico)', dots: 1 },
+      { id: 'ref', name: 'REF (Reflexos)', dots: 1 },
+      { id: 'vig', name: 'VIG (Vigor)', dots: 1 },
+      { id: 'int', name: 'INT (Inteligência)', dots: 1 },
+      { id: 'per', name: 'PER (Percepção)', dots: 1 },
+      { id: 'car', name: 'CAR (Carisma)', dots: 1 }
+    ];
+    let currentSkills = [];
+    let currentRoll = null;
+
+    // Inicialização com o Owlbear Rodeo
+    OBR.onReady(async () => {
+      renderAttributes();
+      renderSkills();
+      loadFromLocalStorage();
+
+      // Monitora mudanças na seleção do mapa (se o jogador clicar em um token)
+      OBR.scene.onSelectionChange(async (selection) => {
+        if (selection && selection.length === 1) {
+          const items = await OBR.scene.items.getItems([selection[0]]);
+          if (items.length > 0 && items[0].layer === "CHARACTER") {
+            setBoundToken(items[0]);
+            return;
+          }
+        }
+        clearBoundToken();
+      });
+
+      // Configura botão de salvar no token
+      document.getElementById('btnSyncToken').addEventListener('click', saveToSelectedToken);
+    });
+
+    function setBoundToken(token) {
+      selectedTokenId = token.id;
+      const statusEl = document.getElementById('tokenStatus');
+      const btnSync = document.getElementById('btnSyncToken');
+      
+      statusEl.innerText = `Token: ${token.text?.plainText || token.name || 'Personagem'}`;
+      statusEl.className = "text-[10px] text-purple-400 font-bold truncate max-w-[140px]";
+      btnSync.classList.remove('hidden');
+
+      // Se o token já possui dados da ficha salvos em seu metadata, carrega automaticamente
+      if (token.metadata && token.metadata[SHEET_METADATA_KEY]) {
+        applyDataToSheet(token.metadata[SHEET_METADATA_KEY]);
+        showToast("Ficha do Token carregada!");
+      }
+    }
+
+    function clearBoundToken() {
+      selectedTokenId = null;
+      const statusEl = document.getElementById('tokenStatus');
+      const btnSync = document.getElementById('btnSyncToken');
+      statusEl.innerText = "Modo Local (Nenhum Token)";
+      statusEl.className = "text-[10px] text-slate-400 font-medium";
+      btnSync.classList.add('hidden');
+    }
+
+    async function saveToSelectedToken() {
+      if (!selectedTokenId) return;
+      const sheetData = collectSheetData();
+      await OBR.scene.items.updateItems([selectedTokenId], (items) => {
+        for (let item of items) {
+          item.metadata[SHEET_METADATA_KEY] = sheetData;
+        }
+      });
+      showToast("Ficha salva no Token!");
+    }
+
+    // Auto-save local (para não perder nada caso feche o popover)
+    window.autoSave = function() {
+      const data = collectSheetData();
+      localStorage.setItem('waymaker_local_sheet', JSON.stringify(data));
+      if (selectedTokenId) {
+        saveToSelectedToken();
+      }
+    };
+
+    function loadFromLocalStorage() {
+      const saved = localStorage.getItem('waymaker_local_sheet');
+      if (saved) {
+        try {
+          applyDataToSheet(JSON.parse(saved));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+
+    window.renderAttributes = function() {
+      const container = document.getElementById('attributesContainer');
+      container.innerHTML = '';
+      currentAttributes.forEach((attr, attrIdx) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between p-1 rounded hover:bg-slate-900/60 transition';
+        let dotsHTML = '<div class="flex items-center gap-1">';
+        for (let i = 1; i <= 6; i++) {
+          const isFilled = i <= attr.dots ? 'filled' : '';
+          dotsHTML += `<span class="dot ${isFilled}" onclick="setAttributeDots(${attrIdx}, ${i})"></span>`;
+        }
+        dotsHTML += '</div>';
+        row.innerHTML = `<span class="text-[10px] font-bold text-slate-200">${attr.name}</span>${dotsHTML}`;
+        container.appendChild(row);
+      });
+    };
+
+    window.setAttributeDots = function(index, value) {
+      if (currentAttributes[index].dots === value && value > 1) {
+        currentAttributes[index].dots = value - 1;
+      } else {
+        currentAttributes[index].dots = Math.max(1, value);
+      }
+      renderAttributes();
+      autoSave();
+    };
+
+    window.renderSkills = function() {
+      const container = document.getElementById('skillsContainer');
+      const emptyState = document.getElementById('skillsEmptyState');
+      container.innerHTML = '';
+      
+      if(currentSkills.length === 0) {
+        emptyState.style.display = 'block';
+      } else {
+        emptyState.style.display = 'none';
+        currentSkills.forEach((skill, skillIdx) => {
+          const col = document.createElement('div');
+          col.className = 'flex items-center justify-between p-1.5 rounded bg-slate-900 border border-slate-800 w-full';
+          let dotsHTML = '<div class="flex items-center gap-1 flex-shrink-0">';
+          for (let i = 1; i <= 4; i++) {
+            const isFilled = i <= skill.dots ? 'filled' : '';
+            dotsHTML += `<span class="dot !w-3 !h-3 ${isFilled}" onclick="setSkillDots(${skillIdx}, ${i})"></span>`;
+          }
+          dotsHTML += '</div>';
+          col.innerHTML = `
+            <input type="text" value="${skill.name}" onchange="updateSkillName(${skillIdx}, this.value)" class="bg-transparent text-[11px] text-slate-300 focus:outline-none flex-1 min-w-0 mr-1 truncate placeholder-slate-600" placeholder="Nome...">
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+              ${dotsHTML}
+              <i class="fa-solid fa-xmark text-red-500/50 hover:text-red-500 cursor-pointer ml-1 text-xs" onclick="removeSkill(${skillIdx})"></i>
+            </div>
+          `;
+          container.appendChild(col);
+        });
+      }
+    };
+
+    window.setSkillDots = function(index, value) {
+      if (currentSkills[index].dots === value) currentSkills[index].dots = value - 1;
+      else currentSkills[index].dots = value;
+      renderSkills();
+      autoSave();
+    };
+
+    window.updateSkillName = function(index, newName) {
+      currentSkills[index].name = newName;
+      autoSave();
+    };
+    
+    window.addSkill = function() {
+      currentSkills.push({ name: '', dots: 0 });
+      renderSkills();
+      autoSave();
+    };
+    
+    window.removeSkill = function(index) {
+      currentSkills.splice(index, 1);
+      renderSkills();
+      autoSave();
+    };
+
+    window.addDynamicRow = function(containerId, ph1, ph2, ph3, ph4) {
+      const container = document.getElementById(containerId);
+      const div = document.createElement('div');
+      div.className = 'grid grid-cols-12 gap-1 items-center row-entry w-full';
+      if (ph4) {
+        div.innerHTML = `
+          <input type="text" placeholder="${ph1}" onchange="autoSave()" class="col-span-3 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-200 focus:outline-none">
+          <input type="text" placeholder="${ph2}" onchange="autoSave()" class="col-span-2 bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 focus:outline-none text-center">
+          <input type="text" placeholder="${ph3}" onchange="autoSave()" class="col-span-3 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-200 focus:outline-none">
+          <input type="text" placeholder="${ph4}" onchange="autoSave()" class="col-span-3 bg-slate-900 border border-purple-900/40 rounded px-1.5 py-0.5 text-[10px] text-purple-300 focus:outline-none">
+          <button onclick="this.parentElement.remove(); autoSave();" class="col-span-1 flex items-center justify-center text-red-500/50 hover:text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button>
+        `;
+      } else {
+        div.innerHTML = `
+          <input type="text" placeholder="${ph1}" onchange="autoSave()" class="col-span-4 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-200 focus:outline-none">
+          <input type="text" placeholder="${ph2}" onchange="autoSave()" class="col-span-2 bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 focus:outline-none text-center">
+          <input type="text" placeholder="${ph3}" onchange="autoSave()" class="col-span-5 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-200 focus:outline-none">
+          <button onclick="this.parentElement.remove(); autoSave();" class="col-span-1 flex items-center justify-center text-red-500/50 hover:text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button>
+        `;
+      }
+      container.appendChild(div);
+      autoSave();
+    };
+
+    function getDynamicRowsData(containerId) {
+      const container = document.getElementById(containerId);
+      const rows = container.querySelectorAll('.row-entry');
+      const data = [];
+      rows.forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        if(Array.from(inputs).some(i => i.value.trim() !== '')) {
+          data.push({ 
+            col1: inputs[0]?.value || '', 
+            col2: inputs[1]?.value || '', 
+            col3: inputs[2]?.value || '',
+            col4: inputs[3]?.value || ''
+          });
+        }
+      });
+      return data;
+    }
+
+    function restoreDynamicRowsData(containerId, data, ph1, ph2, ph3, ph4) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      if(data && data.length > 0) {
+        data.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'grid grid-cols-12 gap-1 items-center row-entry w-full';
+          if (ph4) {
+            div.innerHTML = `
+              <input type="text" placeholder="${ph1}" value="${item.col1 || ''}" onchange="autoSave()" class="col-span-3 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-200 focus:outline-none">
+              <input type="text" placeholder="${ph2}" value="${item.col2 || ''}" onchange="autoSave()" class="col-span-2 bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 focus:outline-none text-center">
+              <input type="text" placeholder="${ph3}" value="${item.col3 || ''}" onchange="autoSave()" class="col-span-3 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-200 focus:outline-none">
+              <input type="text" placeholder="${ph4}" value="${item.col4 || ''}" onchange="autoSave()" class="col-span-3 bg-slate-900 border border-purple-900/40 rounded px-1.5 py-0.5 text-[10px] text-purple-300 focus:outline-none">
+              <button onclick="this.parentElement.remove(); autoSave();" class="col-span-1 flex items-center justify-center text-red-500/50 hover:text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button>
+            `;
+          } else {
+            div.innerHTML = `
+              <input type="text" placeholder="${ph1}" value="${item.col1 || ''}" onchange="autoSave()" class="col-span-4 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-200 focus:outline-none">
+              <input type="text" placeholder="${ph2}" value="${item.col2 || ''}" onchange="autoSave()" class="col-span-2 bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-200 focus:outline-none text-center">
+              <input type="text" placeholder="${ph3}" value="${item.col3 || ''}" onchange="autoSave()" class="col-span-5 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-200 focus:outline-none">
+              <button onclick="this.parentElement.remove(); autoSave();" class="col-span-1 flex items-center justify-center text-red-500/50 hover:text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button>
+            `;
+          }
+          container.appendChild(div);
+        });
+      }
+    }
+
+    function collectSheetData() {
+      return {
+        identity: {
+          name: document.getElementById('charName').value,
+          especie: document.getElementById('charEspecie').value,
+          arquetipo: document.getElementById('charArquetipo').value,
+          expAtual: document.getElementById('charExpAtual').value,
+          expTotal: document.getElementById('charExpTotal').value,
+          tamanho: document.getElementById('charTamanho').value,
+          velocidade: document.getElementById('charVelocidade').value,
+          moedas: document.getElementById('charMoedas').value,
+          vantagens: document.getElementById('charVantagens').value,
+          desvantagens: document.getElementById('charDesvantagens').value
+        },
+        stats: {
+          vida: [document.getElementById('vidaAtual').value, document.getElementById('vidaMax').value],
+          estamina: [document.getElementById('estaminaAtual').value, document.getElementById('estaminaMax').value],
+          mistico: [document.getElementById('misticoAtual').value, document.getElementById('misticoMax').value],
+          defesas: [document.getElementById('statArmadura').value, document.getElementById('statDefesa').value, document.getElementById('statResolucao').value]
+        },
+        attributes: currentAttributes,
+        skills: currentSkills,
+        lists: {
+          weapons: getDynamicRowsData('weaponsContainer'),
+          tecnicasPoderes: getDynamicRowsData('tecnicasPoderesContainer'),
+          itens: getDynamicRowsData('itensContainer')
+        }
+      };
+    }
+
+    function applyDataToSheet(d) {
+      if (!d) return;
+      document.getElementById('charName').value = d.identity?.name || '';
+      document.getElementById('charEspecie').value = d.identity?.especie || '';
+      document.getElementById('charArquetipo').value = d.identity?.arquetipo || '';
+      document.getElementById('charExpAtual').value = d.identity?.expAtual || '';
+      document.getElementById('charExpTotal').value = d.identity?.expTotal || '';
+      document.getElementById('charTamanho').value = d.identity?.tamanho || '';
+      document.getElementById('charVelocidade').value = d.identity?.velocidade || '';
+      document.getElementById('charMoedas').value = d.identity?.moedas || '';
+      document.getElementById('charVantagens').value = d.identity?.vantagens || '';
+      document.getElementById('charDesvantagens').value = d.identity?.desvantagens || '';
+
+      document.getElementById('vidaAtual').value = d.stats?.vida?.[0] || '';
+      document.getElementById('vidaMax').value = d.stats?.vida?.[1] || '';
+      document.getElementById('estaminaAtual').value = d.stats?.estamina?.[0] || '';
+      document.getElementById('estaminaMax').value = d.stats?.estamina?.[1] || '';
+      document.getElementById('misticoAtual').value = d.stats?.mistico?.[0] || '';
+      document.getElementById('misticoMax').value = d.stats?.mistico?.[1] || '';
+
+      document.getElementById('statArmadura').value = d.stats?.defesas?.[0] || '';
+      document.getElementById('statDefesa').value = d.stats?.defesas?.[1] || '';
+      document.getElementById('statResolucao').value = d.stats?.defesas?.[2] || '';
+
+      if (d.attributes) currentAttributes = d.attributes;
+      if (d.skills) currentSkills = d.skills;
+      renderAttributes();
+      renderSkills();
+
+      restoreDynamicRowsData('weaponsContainer', d.lists?.weapons, 'Arma', 'Dano', 'Propriedades', 'Tags');
+      restoreDynamicRowsData('tecnicasPoderesContainer', d.lists?.tecnicasPoderes, 'Nome', 'Custo', 'Efeito', 'Tags');
+      restoreDynamicRowsData('itensContainer', d.lists?.itens, 'Item', 'Qtd', 'Descrição');
+    }
+
+    window.exportJSON = function() {
+      const data = collectSheetData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Ficha_${data.identity.name || 'Waymaker'}.json`;
+      link.click();
+      showToast('Ficha salva!');
+    };
+
+    window.importJSON = function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const d = JSON.parse(e.target.result);
+          applyDataToSheet(d);
+          autoSave();
+          showToast('Ficha carregada!');
+        } catch (err) {
+          showToast('Arquivo inválido!', 'fa-circle-xmark');
+        }
+      };
+      reader.readAsText(file);
+    };
+
+    window.resetSheet = function() {
+      if (!confirm("Deseja realmente limpar a ficha?")) return;
+      document.querySelectorAll('input, textarea').forEach(i => i.value = '');
+      currentAttributes.forEach(a => a.dots = 1);
+      currentSkills = [];
+      renderAttributes();
+      renderSkills();
+      ['weaponsContainer', 'tecnicasPoderesContainer', 'itensContainer'].forEach(id => document.getElementById(id).innerHTML = '');
+      autoSave();
+      showToast('Ficha reiniciada!');
+    };
+
+    function getPipDieHTML(value, isWild = false, isSuccess = false, isComp = false) {
+      const pipPositions = {
+        1: [4],
+        2: [0, 8],
+        3: [0, 4, 8],
+        4: [0, 2, 6, 8],
+        5: [0, 2, 4, 6, 8],
+        6: [0, 2, 3, 5, 6, 8]
+      };
+      const activePips = pipPositions[value] || [4];
+
+      let bgClass = "bg-slate-900";
+      let borderClass = "border-slate-700/80";
+      let pipColor = "bg-slate-300";
+
+      if (isWild) {
+        bgClass = "bg-purple-950/80";
+        borderClass = "border-2 border-purple-400";
+        pipColor = "bg-purple-300 shadow-[0_0_5px_rgba(192,132,252,0.9)]";
+      } else if (isSuccess) {
+        bgClass = "bg-green-950/50";
+        borderClass = "border border-green-500/60";
+        pipColor = "bg-green-400 shadow-[0_0_4px_rgba(74,222,128,0.9)]";
+      } else if (isComp) {
+        bgClass = "bg-red-950/50";
+        borderClass = "border border-red-500/60";
+        pipColor = "bg-red-400 shadow-[0_0_4px_rgba(248,113,113,0.9)]";
+      }
+
+      let pipsHTML = '';
+      for (let i = 0; i < 9; i++) {
+        const isActive = activePips.includes(i);
+        pipsHTML += `<div class="flex items-center justify-center">
+          <span class="w-1.5 h-1.5 rounded-full ${isActive ? pipColor : 'bg-transparent'}"></span>
+        </div>`;
+      }
+
+      return `
+        <div class="w-9 h-9 rounded-lg p-1 grid grid-cols-3 grid-rows-3 gap-0.5 ${bgClass} ${borderClass} shadow-sm">
+          ${pipsHTML}
+        </div>
+      `;
+    }
+
+    window.openDiceModal = function() {
+      const attr = document.getElementById('diceAttrSelect');
+      const skill = document.getElementById('diceSkillSelect');
+      attr.innerHTML = currentAttributes.map(a => `<option value="${a.dots}">${a.name} (${a.dots})</option>`).join('');
+      skill.innerHTML = '<option value="0">Sem perícia (0)</option>' + currentSkills.map(s => `<option value="${s.dots}">${s.name || 'Nova'} (${s.dots})</option>`).join('');
+      document.getElementById('diceResultBox').classList.add('hidden');
+      document.getElementById('diceModal').classList.remove('hidden');
+      currentRoll = null;
+    };
+
+    window.closeDiceModal = function() {
+      document.getElementById('diceModal').classList.add('hidden');
+    };
+
+    window.rollDicePool = async function() {
+      let attrVal = parseInt(document.getElementById('diceAttrSelect').value) || 0;
+      let skillVal = parseInt(document.getElementById('diceSkillSelect').value) || 0;
+      let qtdTotalDados = Math.max(1, attrVal + skillVal);
+      let qtdDadosNormais = qtdTotalDados - 1;
+
+      let dc = parseInt(document.getElementById('diceDC').value) || 1;
+      let modo = document.getElementById('diceMod').value;
+
+      let dadoEspecial = Math.floor(Math.random() * 6) + 1;
+      let dadosNormais = [];
+      for(let i = 0; i < qtdDadosNormais; i++) {
+        dadosNormais.push(Math.floor(Math.random() * 6) + 1);
+      }
+
+      let sucessos = 0;
+      let complicacoes = 0;
+
+      dadosNormais.forEach(d => {
+        if (d === 5 || d === 6) sucessos++;
+        else if (d === 4 && modo === 'v') sucessos++;
+        if (modo === 'd' && (d === 1 || d === 2)) complicacoes++;
+      });
+
+      if (dadoEspecial === 6) sucessos += 2;
+      else if (dadoEspecial === 5) sucessos += 1;
+      else if (dadoEspecial === 4 && modo === 'v') sucessos += 1;
+
+      if (dadoEspecial === 1) complicacoes += 1;
+      else if (dadoEspecial === 2 && modo === 'd') complicacoes += 1;
+
+      let ampliacoes = sucessos >= dc ? sucessos - dc : 0;
+
+      currentRoll = { qtdDadosNormais, dc, modo, dadoEspecial, dadosNormais, sucessos, complicacoes, ampliacoes };
+      renderRollResult();
+
+      // Transmite a notificação para todos na mesa do Owlbear Rodeo
+      const charName = document.getElementById('charName').value.trim() || 'Personagem';
+      const outcome = sucessos >= dc ? 'SUCESSO' : 'FALHA';
+      try {
+        await OBR.notification.show(`🎲 ${charName} rolou ${qtdTotalDados}d6 (DC ${dc}): ${outcome}! [Sucessos: ${sucessos} | Complicações: ${complicacoes}]`);
+      } catch (e) {
+        console.log("Notificação local.");
+      }
+    };
+
+    function renderRollResult(pagouPreco = false) {
+      if (!currentRoll) return;
+      const { qtdDadosNormais, dc, modo, dadoEspecial, dadosNormais, sucessos, complicacoes, ampliacoes } = currentRoll;
+      
+      let titulo = "";
+      let desc = "";
+      let corBorda = "";
+      let corTexto = "";
+
+      if (pagouPreco) {
+        if (complicacoes > 0) {
+          titulo = "⚠️ SUCESSO C/ COMPLICAÇÃO (PREÇO PAGO)";
+          corBorda = "border-orange-500/50"; corTexto = "text-orange-400";
+          desc = `Resta(m) ${complicacoes} Complicação(ões).`;
+        } else {
+          titulo = "✅ SUCESSO (PREÇO PAGO)";
+          corBorda = "border-green-500/50"; corTexto = "text-green-400";
+          desc = "Todas as complicações foram anuladas!";
+        }
+      } else {
+        if (sucessos >= dc) {
+          if (complicacoes > 0) {
+            titulo = "⚠️ SUCESSO C/ COMPLICAÇÃO";
+            corBorda = "border-orange-500/50"; corTexto = "text-orange-400";
+            desc = `Atingiu a DC, mas gerou ${complicacoes} Complicação(ões)!`;
+          } else if (ampliacoes > 0) {
+            titulo = "🌟 SUCESSO AMPLIADO";
+            corBorda = "border-green-500/50"; corTexto = "text-green-400";
+            desc = `Superou a DC com +${ampliacoes} Ampliação(ões)!`;
+          } else {
+            titulo = "✅ SUCESSO";
+            corBorda = "border-green-500/50"; corTexto = "text-green-400";
+            desc = "Atingiu a DC requerida.";
+          }
+        } else {
+          titulo = complicacoes > 0 ? "💀 FALHA CRÍTICA" : "❌ FALHA";
+          corBorda = "border-red-600/60"; corTexto = "text-red-500";
+          desc = `Não atingiu a DC.${complicacoes > 0 ? ` +${complicacoes} Complicação(ões)!` : ''}`;
+        }
+      }
+
+      const box = document.getElementById('diceResultBox');
+      box.className = `bg-slate-950 border ${corBorda} rounded-xl p-3 text-center block`;
+      
+      const titleEl = document.getElementById('diceResultTitle');
+      titleEl.className = `text-xs font-bold uppercase mb-1 ${corTexto}`;
+      titleEl.innerText = titulo;
+      document.getElementById('diceResultDesc').innerText = desc;
+      
+      let visualHtml = getPipDieHTML(dadoEspecial, true);
+      dadosNormais.forEach(d => {
+        let isSuccess = (d === 5 || d === 6) || (d === 4 && modo === 'v');
+        let isComp = modo === 'd' && (d === 1 || d === 2);
+        visualHtml += getPipDieHTML(d, false, isSuccess, isComp);
+      });
+      document.getElementById('dicePoolVisual').innerHTML = visualHtml;
+
+      document.getElementById('resDados').innerText = `${qtdDadosNormais + 1}d6`;
+      document.getElementById('resDC').innerText = dc;
+      document.getElementById('resSucessos').innerText = sucessos + (ampliacoes > 0 ? ` (+${ampliacoes})` : "");
+      document.getElementById('resComplicacoes').innerText = complicacoes;
+
+      const btn = document.getElementById('btnPagarPreco');
+      if (!pagouPreco && complicacoes > 0 && ampliacoes > 0) {
+        btn.classList.remove('hidden');
+        btn.innerHTML = `<i class="fa-solid fa-scale-balanced"></i> Pagar o Preço (${Math.min(ampliacoes, complicacoes)})`;
+        btn.disabled = false;
+      } else if (pagouPreco) {
+        btn.classList.remove('hidden');
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> Preço Pago`;
+        btn.disabled = true;
+      } else {
+        btn.classList.add('hidden');
+      }
+    }
+
+    window.pagarPreco = function() {
+      if (!currentRoll || currentRoll.complicacoes <= 0 || currentRoll.ampliacoes <= 0) return;
+      let custo = Math.min(currentRoll.ampliacoes, currentRoll.complicacoes);
+      currentRoll.sucessos -= custo;
+      currentRoll.ampliacoes = currentRoll.sucessos >= currentRoll.dc ? currentRoll.sucessos - currentRoll.dc : 0;
+      currentRoll.complicacoes -= custo;
+      renderRollResult(true);
+    };
+
+    function showToast(msg, icon = 'fa-circle-check') {
+      const t = document.getElementById('toast');
+      document.getElementById('toastMessage').innerText = msg;
+      document.getElementById('toastIcon').className = `fa-solid ${icon} text-purple-400`;
+      t.classList.remove('translate-y-16', 'opacity-0');
+      setTimeout(() => t.classList.add('translate-y-16', 'opacity-0'), 2500);
+    }
+  </script>
+</body>
+</html>
