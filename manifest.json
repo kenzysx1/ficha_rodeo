@@ -1,14 +1,14 @@
 {
   "name": "Waymaker RPG Sheet",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "manifest_version": 1,
   "author": "Waymaker Engine",
-  "description": "Ficha de personagem interativa e rolador de dados de reserva para Waymaker RPG.",
-  "icon": "./icon.svg",
+  "description": "Ficha de personagem interativa para Waymaker RPG.",
+  "icon": "https://kenzysx1.github.io/ficha_rodeo/icon.svg",
   "action": {
     "title": "Waymaker Ficha",
-    "icon": "./icon.svg",
-    "popover": "./index.html",
+    "icon": "https://kenzysx1.github.io/ficha_rodeo/icon.svg",
+    "popover": "https://kenzysx1.github.io/ficha_rodeo/index.html",
     "width": 640,
     "height": 780
   }
